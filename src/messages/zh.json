@@ -1,0 +1,188 @@
+{
+  "title": "AI Creator Studio",
+  "nav": {
+    "logo": "AI Creator Studio",
+    "dashboard": "仪表盘",
+    "tasks": "任务",
+    "create": "创建",
+    "library": "素材库",
+    "templates": "模板",
+    "prompts": "模板",
+    "analytics": "分析",
+    "settings": "设置"
+  },
+  "common": {
+    "getStarted": "开始使用",
+    "explore": "探索",
+    "viewTemplates": "查看模板",
+    "settings": "设置"
+  },
+  "home": {
+    "title": "AI Creator Studio",
+    "subtitle": "AI驱动的图片和视频生成平台",
+    "features": {
+      "batch": "批量处理",
+      "cache": "智能缓存",
+      "models": "多种AI模型"
+    },
+    "imageGeneration": {
+      "title": "图片生成",
+      "description": "使用AI创建精美图片"
+    },
+    "videoCreation": {
+      "title": "视频创建", 
+      "description": "根据文本提示词生成视频"
+    },
+    "templateLibrary": {
+      "title": "模板库",
+      "description": "浏览和管理提示词模板"
+    },
+    "emailPlaceholder": "输入您的邮箱地址开始",
+    "subscribe": "订阅"
+  },
+  "tasks": {
+    "title": "任务",
+    "subtitle": "管理您的AI生成任务",
+    "create": {
+      "title": "创建新任务",
+      "subtitle": "设置AI生成任务的参数配置"
+    },
+    "detail": {
+      "title": "任务详情",
+      "taskId": "任务ID: "
+    },
+    "list": {
+      "title": "任务列表",
+      "filter": "筛选",
+      "search": "搜索",
+      "status": {
+        "all": "所有状态",
+        "pending": "待处理",
+        "running": "运行中", 
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "已取消"
+      },
+      "type": {
+        "all": "所有类型",
+        "image": "图片",
+        "video": "视频"
+      },
+      "noTasks": "暂无任务",
+      "createFirst": "创建您的第一个AI生成任务"
+    }
+  },
+  "taskForm": {
+    "basicConfig": {
+      "title": "基础配置",
+      "description": "配置您的AI生成参数"
+    },
+    "type": {
+      "label": "生成类型",
+      "image": "图片生成",
+      "video": "视频生成"
+    },
+    "promptEditor": {
+      "title": "提示词编辑器",
+      "description": "使用变量语法 @变量名:类型 [选项] (描述) =默认值 来定义变量",
+      "originalPrompt": "原始提示词",
+      "expandedPrompt": "展开后的提示词",
+      "placeholder": "例如: @occupation:select [医生,工程师,艺术家] (职业) @style:text (风格) =现代 Professional portrait of a {occupation}, {style} style",
+      "help": {
+        "syntax": "• 变量语法: @name:type [options] (description) = default value",
+        "types": "• 支持类型: text (文本), select (下拉), number (数字)",
+        "usage": "• 变量使用: 在提示词中用 {name} 引用"
+      }
+    },
+    "variableConfig": {
+      "title": "变量配置",
+      "description": "配置每个变量的值，这些值将被替换到提示词中",
+      "variables": "个变量"
+    },
+    "model": {
+      "label": "AI模型",
+      "placeholder": "选择一个模型"
+    },
+    "advancedOptions": {
+      "title": "高级参数",
+      "description": "可选的高级配置选项",
+      "statistics": "变量统计",
+      "details": "变量定义详情"
+    },
+    "imageParams": {
+      "title": "图片参数",
+      "description": "配置图片生成的具体参数"
+    },
+    "videoParams": {
+      "title": "视频参数", 
+      "description": "配置视频生成的具体参数"
+    },
+    "cost": {
+      "label": "预估成本",
+      "basedOn": "基于当前参数的预估费用"
+    },
+    "actions": {
+      "submit": "开始生成",
+      "cancel": "取消",
+      "clear": "清空",
+      "reset": "重置为默认值"
+    }
+  },
+  "library": {
+    "title": "素材库",
+    "subtitle": "浏览和管理您生成的内容",
+    "filter": "筛选",
+    "search": "搜索素材",
+    "viewMode": {
+      "grid": "网格",
+      "list": "列表"
+    },
+    "type": {
+      "all": "所有类型",
+      "image": "图片",
+      "video": "视频"
+    },
+    "actions": {
+      "export": "导出选中",
+      "upload": "上传内容",
+      "download": "下载",
+      "addToCollection": "添加到收藏",
+      "delete": "删除"
+    },
+    "noMaterials": "暂无素材",
+    "createFirst": "生成一些内容以看到它出现在您的素材库中",
+    "selected": "个项目已选中"
+  },
+  "templates": {
+    "title": "Prompt 模板",
+    "subtitle": "管理和重用您的提示词模板",
+    "create": "创建新模板",
+    "noTemplates": "暂无模板",
+    "createFirst": "创建您的第一个模板"
+  },
+  "analytics": {
+    "title": "分析仪表板",
+    "subtitle": "跟踪您的AI生成成本和使用情况",
+    "exportReport": "导出报表",
+    "refresh": "刷新数据",
+    "metrics": {
+      "totalCost": "总成本",
+      "generations": "生成次数",
+      "cacheHitRate": "缓存命中率",
+      "avgCost": "平均成本/次",
+      "change": "相对上个月"
+    },
+    "costTrend": {
+      "title": "成本趋势",
+      "description": "月度成本明细"
+    },
+    "modelUsage": {
+      "title": "模型使用",
+      "description": "生成分布按AI模型"
+    },
+    "recentActivity": {
+      "title": "最近活动",
+      "description": "最新生成任务和成本"
+    }
+  }
+}

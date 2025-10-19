@@ -1,0 +1,40 @@
+{
+  "name": "Cache Management Workflow",
+  "description": "Intelligent caching system for AI generation results",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cache-lookup",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook - Cache Lookup",
+      "type": "n8n-nodes-base.webhook",
+      "position": [420, 240]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "resource": "record",
+        "datasetId": "cache_dataset",
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.prompt_hash }}",
+              "rightValue": "prompt_hash",
+              "operator": { "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "name": "Code - Check Cache",
+      "type": "n8n-nodes-base.code",
+      "position": [600, 240]
+    }
+  ],
+  "connections": {
+    "Webhook - Cache Lookup": {
+      "main": [["Code - Check Cache"]]
+    }
+  }
+}

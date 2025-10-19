@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置页面测试 - 原生HTML</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto p-6 max-w-4xl">
+        <h1 class="text-2xl font-bold mb-6">设置页面测试 - 原生HTML</h1>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">基础按钮测试</h2>
+            <p class="text-gray-600 mb-4">这些按钮使用原生 JavaScript，没有 React 或其他框架。</p>
+
+            <div class="space-x-4">
+                <button
+                    onclick="alert('原生JavaScript按钮点击成功！')"
+                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                >
+                    测试按钮 1
+                </button>
+
+                <button
+                    onclick="console.log('控制台日志测试'); alert('控制台日志已写入！')"
+                    class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                >
+                    测试按钮 2
+                </button>
+
+                <button
+                    onmousedown="console.log('鼠标按下')"
+                    onmouseup="console.log('鼠标释放')"
+                    class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600"
+                >
+                    鼠标事件测试
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">表单测试</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">API Key 输入测试：</label>
+                    <input
+                        type="text"
+                        id="apiKeyInput"
+                        placeholder="输入一些文字测试"
+                        class="w-full p-2 border rounded"
+                        oninput="console.log('输入内容：', this.value)"
+                    />
+                </div>
+
+                <div>
+                    <label class="flex items-center">
+                        <input
+                            type="checkbox"
+                            id="enableToggle"
+                            onchange="console.log('复选框状态：', this.checked)"
+                            class="mr-2"
+                        />
+                        <span>启用服务</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">系统信息</h2>
+            <div id="systemInfo" class="space-y-2 text-sm">
+                <p><strong>JavaScript状态：</strong> <span id="jsStatus">检查中...</span></p>
+                <p><strong>浏览器：</strong> <span id="browserInfo">检查中...</span></p>
+                <p><strong>当前时间：</strong> <span id="currentTime">检查中...</span></p>
+                <p><strong>页面URL：</strong> <span id="pageUrl">检查中...</span></p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">事件监听器测试</h2>
+            <p class="text-gray-600 mb-4">测试通过 addEventListener 添加的事件监听器。</p>
+
+            <button id="listenerBtn" class="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600">
+                事件监听器测试按钮
+            </button>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">导航测试</h2>
+            <p class="text-gray-600 mb-4">测试页面导航功能。</p>
+
+            <div class="space-x-4">
+                <a href="/zh-CN/settings" class="bg-blue-100 text-blue-700 px-4 py-2 rounded hover:bg-blue-200 inline-block">
+                    → 返回设置页面
+                </a>
+
+                <a href="/zh-CN" class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 inline-block">
+                    → 返回首页
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 系统信息检查
+        document.getElementById('jsStatus').textContent = '✅ 已启用';
+        document.getElementById('browserInfo').textContent = navigator.userAgent;
+        document.getElementById('currentTime').textContent = new Date().toLocaleString();
+        document.getElementById('pageUrl').textContent = window.location.href;
+
+        // 事件监听器测试
+        document.getElementById('listenerBtn').addEventListener('click', function() {
+            console.log('事件监听器触发成功！');
+            alert('事件监听器测试成功！这个按钮通过 addEventListener 工作。');
+        });
+
+        // 页面加载完成检查
+        window.addEventListener('load', function() {
+            console.log('页面完全加载完成');
+            console.log('DOM 状态：', document.readyState);
+            console.log('所有脚本已加载');
+        });
+
+        // 错误监听
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript 错误：', e.error);
+        });
+
+        console.log('原生HTML测试页面已加载');
+        console.log('如果看到这条消息，说明 JavaScript 正常工作');
+        console.log('请测试上面的按钮功能');
+    </script>
+</body>
+</html>

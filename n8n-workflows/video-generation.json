@@ -1,0 +1,76 @@
+{
+  "name": "AI Video Generation Workflow",
+  "description": "Complete workflow for AI video generation with processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "video-generation",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook - Start Generation",
+      "type": "n8n-nodes-base.webhook",
+      "position": [420, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "video",
+              "operator": { "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "name": "If - Check Type",
+      "type": "n8n-nodes-base.if",
+      "position": [600, 240]
+    },
+    {
+      "parameters": {
+        "url": "https://api.runwayml.com/v1/imagine",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "runwayApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text_prompt",
+              "value": "={{ $json.prompt }}"
+            },
+            {
+              "name": "model",
+              "value": "={{ $json.model || 'gen3a_turbo' }}"
+            },
+            {
+              "name": "watermark",
+              "value": "={{ $json.watermark || false }}"
+            }
+          ]
+        }
+      },
+      "name": "HTTP Request - Runway",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [800, 200]
+    }
+  ],
+  "connections": {
+    "Webhook - Start Generation": {
+      "main": [["If - Check Type"]]
+    },
+    "If - Check Type": {
+      "main": [["HTTP Request - Runway"]]
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "name": "AI Image Generation Workflow",
+  "description": "Complete workflow for AI image generation with caching and storage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "image-generation",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook - Start Generation",
+      "type": "n8n-nodes-base.webhook",
+      "position": [420, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "image",
+              "operator": { "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "name": "If - Check Type",
+      "type": "n8n-nodes-base.if",
+      "position": [600, 240]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{ $json.model || 'dall-e-3' }}"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $json.prompt }}"
+            },
+            {
+              "name": "n",
+              "value": "={{ $json.quantity || 1 }}"
+            }
+          ]
+        }
+      },
+      "name": "HTTP Request - OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [800, 200]
+    }
+  ],
+  "connections": {
+    "Webhook - Start Generation": {
+      "main": [["If - Check Type"]]
+    },
+    "If - Check Type": {
+      "main": [["HTTP Request - OpenAI"]]
+    }
+  }
+}
