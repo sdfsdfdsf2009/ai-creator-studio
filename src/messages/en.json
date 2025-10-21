@@ -4,6 +4,7 @@
     "dashboard": "Dashboard",
     "tasks": "Tasks",
     "create": "Create",
+    "batchTasks": "Batch Tasks",
     "library": "Library",
     "templates": "Templates",
     "prompts": "Templates",
@@ -218,5 +219,71 @@
     "about": "About",
     "version": "Version",
     "logout": "Logout"
+  },
+  "batchTasks": {
+    "title": "Batch Tasks",
+    "subtitle": "Manage and monitor batch generation tasks",
+    "create": {
+      "title": "Create Batch Task",
+      "subtitle": "Use variable system to batch generate multiple similar but different content"
+    },
+    "config": {
+      "title": "Batch Task Configuration",
+      "description": "Set up basic information and AI model for batch task"
+    },
+    "variables": {
+      "title": "Variable Configuration",
+      "description": "Define variables to batch generate different versions of content"
+    },
+    "estimate": {
+      "title": "Batch Estimate",
+      "estimatedTasks": "Estimated Tasks",
+      "estimatedCost": "Estimated Total Cost",
+      "variableCount": "Variable Count"
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Completed",
+      "completed_with_errors": "Partially Completed",
+      "cancelled": "Cancelled"
+    },
+    "actions": {
+      "create": "Create Batch Task",
+      "startExecution": "Start Execution",
+      "cancelTask": "Cancel Task",
+      "viewDetails": "View Details",
+      "viewResults": "View Results",
+      "backToList": "← Back to Batch Task List"
+    },
+    "progress": {
+      "progress": "Progress",
+      "tasksCompleted": "Tasks Completed",
+      "totalTasks": "Total Tasks",
+      "completed": "Completed",
+      "failed": "Failed",
+      "completionRate": "Completion Rate"
+    },
+    "subtasks": {
+      "title": "Subtask List",
+      "variableValues": "Variable Values",
+      "noTasks": "No batch tasks",
+      "createFirst": "Create the first batch task to experience the power of variable system",
+      "warning": "⚠️ Note: This will generate {count} tasks, please confirm the variable configuration is correct"
+    },
+    "form": {
+      "taskName": "Task Name",
+      "taskNamePlaceholder": "e.g., Professional Portrait Batch Generation",
+      "taskDescription": "Task Description",
+      "taskDescriptionPlaceholder": "Optional: Detailed description of this batch task's purpose",
+      "mediaType": "Media Type",
+      "aiModel": "AI Model",
+      "selectModel": "Please select a model",
+      "imageGeneration": "Image Generation",
+      "videoGeneration": "Video Generation",
+      "submit": "Create Batch Task ({count} subtasks)",
+      "creating": "Creating...",
+      "cancel": "Cancel"
+    }
   }
 }

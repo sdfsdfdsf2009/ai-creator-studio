@@ -5,6 +5,7 @@
     "dashboard": "仪表盘",
     "tasks": "任务",
     "create": "创建",
+    "batchTasks": "批量任务",
     "library": "素材库",
     "templates": "模板",
     "prompts": "模板",
@@ -183,6 +184,72 @@
     "recentActivity": {
       "title": "最近活动",
       "description": "最新生成任务和成本"
+    }
+  },
+  "batchTasks": {
+    "title": "批量任务",
+    "subtitle": "管理和监控批量生成任务",
+    "create": {
+      "title": "创建批量任务",
+      "subtitle": "使用变量系统批量生成多个相似但不完全相同的内容"
+    },
+    "config": {
+      "title": "批量任务配置",
+      "description": "设置批量任务的基本信息和AI模型"
+    },
+    "variables": {
+      "title": "变量配置",
+      "description": "定义变量来批量生成不同版本的内容"
+    },
+    "estimate": {
+      "title": "批量预估",
+      "estimatedTasks": "预估任务数",
+      "estimatedCost": "预估总成本",
+      "variableCount": "变量数量"
+    },
+    "status": {
+      "pending": "等待中",
+      "running": "执行中",
+      "completed": "已完成",
+      "completed_with_errors": "部分完成",
+      "cancelled": "已取消"
+    },
+    "actions": {
+      "create": "创建批量任务",
+      "startExecution": "开始执行",
+      "cancelTask": "取消任务",
+      "viewDetails": "查看详情",
+      "viewResults": "查看结果",
+      "backToList": "← 返回批量任务列表"
+    },
+    "progress": {
+      "progress": "进度",
+      "tasksCompleted": "任务完成",
+      "totalTasks": "总任务",
+      "completed": "已完成",
+      "failed": "失败",
+      "completionRate": "完成率"
+    },
+    "subtasks": {
+      "title": "子任务列表",
+      "variableValues": "变量值",
+      "noTasks": "暂无批量任务",
+      "createFirst": "创建第一个批量任务来体验变量系统的强大功能",
+      "warning": "⚠️ 注意：这将生成 {count} 个任务，请确认变量配置是否正确"
+    },
+    "form": {
+      "taskName": "任务名称",
+      "taskNamePlaceholder": "例如: 职业肖像批量生成",
+      "taskDescription": "任务描述",
+      "taskDescriptionPlaceholder": "可选：详细描述这个批量任务的目的",
+      "mediaType": "媒体类型",
+      "aiModel": "AI模型",
+      "selectModel": "请选择模型",
+      "imageGeneration": "图片生成",
+      "videoGeneration": "视频生成",
+      "submit": "创建批量任务 ({count} 个子任务)",
+      "creating": "创建中...",
+      "cancel": "取消"
     }
   }
 }

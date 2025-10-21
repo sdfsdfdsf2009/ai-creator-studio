@@ -17,6 +17,7 @@ export function Navigation() {
     { name: t('logo'), href: '/', key: 'logo' },
     { name: t('tasks'), href: '/tasks', key: 'tasks' },
     { name: t('create'), href: '/tasks/create', key: 'create' },
+    { name: t('batchTasks'), href: '/batch-tasks', key: 'batchTasks' },
     { name: t('library'), href: '/library', key: 'library' },
     { name: t('files'), href: '/files', key: 'files' },
     { name: t('workflows'), href: '/workflows', key: 'workflows' },
