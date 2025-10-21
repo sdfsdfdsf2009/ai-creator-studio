@@ -169,114 +169,92 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const updatedMaterials: Material[] = []
+    const result = await withDatabase(async (db) => {
+      switch (operation) {
+        case 'delete':
+          // 批量删除
+          for (const id of materialIds) {
+            await db.deleteMaterial(id)
+          }
+          return { deletedCount: materialIds.length }
 
-    switch (operation) {
-      case 'delete':
-        materialIds.forEach(id => {
-          const material = materials.get(id)
-          if (material) {
-            // 更新分类计数
-            const categoryObj = categories.get(material.category || 'default')
-            if (categoryObj) {
-              categoryObj.materialCount = Math.max(0, categoryObj.materialCount - 1)
+        case 'move':
+          // 批量移动分类
+          const { categoryId } = params || {}
+          if (!categoryId) {
+            throw new Error('Missing categoryId for move operation')
+          }
+
+          const updatedMaterials = []
+          for (const id of materialIds) {
+            const material = await db.getMaterial(id)
+            if (material) {
+              const updated = await db.updateMaterial(id, {
+                category: categoryId,
+                updatedAt: new Date().toISOString()
+              })
+              updatedMaterials.push(updated)
             }
-            materials.delete(id)
           }
-        })
-        break
+          return { updatedMaterials }
 
-      case 'move':
-        const { categoryId } = params || {}
-        if (!categoryId) {
-          return NextResponse.json(
-            { success: false, error: 'Missing categoryId for move operation' },
-            { status: 400 }
-          )
-        }
+        case 'addTags':
+          // 批量添加标签
+          const { tags: tagsToAdd } = params || {}
+          if (!Array.isArray(tagsToAdd)) {
+            throw new Error('Missing or invalid tags for addTags operation')
+          }
 
-        materialIds.forEach(id => {
-          const material = materials.get(id)
-          if (material) {
-            // 更新旧分类计数
-            const oldCategory = categories.get(material.category || 'default')
-            if (oldCategory) {
-              oldCategory.materialCount = Math.max(0, oldCategory.materialCount - 1)
+          const addTagMaterials = []
+          for (const id of materialIds) {
+            const material = await db.getMaterial(id)
+            if (material) {
+              const existingTags = new Set(material.tags)
+              tagsToAdd.forEach(tag => existingTags.add(tag))
+              const updated = await db.updateMaterial(id, {
+                tags: Array.from(existingTags),
+                updatedAt: new Date().toISOString()
+              })
+              addTagMaterials.push(updated)
             }
+          }
+          return { updatedMaterials: addTagMaterials }
 
-            // 更新素材分类
-            material.category = categoryId
-            material.updatedAt = new Date().toISOString()
+        case 'removeTags':
+          // 批量移除标签
+          const { tags: tagsToRemove } = params || {}
+          if (!Array.isArray(tagsToRemove)) {
+            throw new Error('Missing or invalid tags for removeTags operation')
+          }
 
-            // 更新新分类计数
-            const newCategory = categories.get(categoryId)
-            if (newCategory) {
-              newCategory.materialCount++
+          const removeTagMaterials = []
+          for (const id of materialIds) {
+            const material = await db.getMaterial(id)
+            if (material) {
+              const filteredTags = material.tags.filter(tag => !tagsToRemove.includes(tag))
+              const updated = await db.updateMaterial(id, {
+                tags: filteredTags,
+                updatedAt: new Date().toISOString()
+              })
+              removeTagMaterials.push(updated)
             }
-
-            updatedMaterials.push(material)
           }
-        })
-        break
+          return { updatedMaterials: removeTagMaterials }
 
-      case 'addTags':
-        const { tags: tagsToAdd } = params || {}
-        if (!Array.isArray(tagsToAdd)) {
-          return NextResponse.json(
-            { success: false, error: 'Missing or invalid tags for addTags operation' },
-            { status: 400 }
-          )
-        }
-
-        materialIds.forEach(id => {
-          const material = materials.get(id)
-          if (material) {
-            const existingTags = new Set(material.tags)
-            tagsToAdd.forEach(tag => existingTags.add(tag))
-            material.tags = Array.from(existingTags)
-            material.updatedAt = new Date().toISOString()
-            updatedMaterials.push(material)
-          }
-        })
-        break
-
-      case 'removeTags':
-        const { tags: tagsToRemove } = params || {}
-        if (!Array.isArray(tagsToRemove)) {
-          return NextResponse.json(
-            { success: false, error: 'Missing or invalid tags for removeTags operation' },
-            { status: 400 }
-          )
-        }
-
-        materialIds.forEach(id => {
-          const material = materials.get(id)
-          if (material) {
-            material.tags = material.tags.filter(tag => !tagsToRemove.includes(tag))
-            material.updatedAt = new Date().toISOString()
-            updatedMaterials.push(material)
-          }
-        })
-        break
-
-      default:
-        return NextResponse.json(
-          { success: false, error: `Unsupported operation: ${operation}` },
-          { status: 400 }
-        )
-    }
+        default:
+          throw new Error(`Unsupported operation: ${operation}`)
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      data: operation === 'delete'
-        ? { deletedCount: materialIds.length }
-        : { updatedMaterials }
+      data: result
     })
 
   } catch (error) {
     console.error('Error performing batch operation:', error)
     return NextResponse.json(
-      { success: false, error: 'Internal server error' },
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }
