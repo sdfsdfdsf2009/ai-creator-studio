@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ const AI_MODELS = {
 }
 
 export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
+  const t = useTranslations('batchTasks')
   const [taskType, setTaskType] = useState<MediaType>('image')
   const [batchName, setBatchName] = useState('')
   const [batchDescription, setBatchDescription] = useState('')
@@ -97,17 +99,17 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
     e.preventDefault()
 
     if (!batchName.trim()) {
-      alert('请输入批量任务名称')
+      alert(t('form.taskName') + ' ' + (typeof window !== 'undefined' ? 'is required' : '不能为空'))
       return
     }
 
     if (!basePrompt.trim()) {
-      alert('请输入基础提示词')
+      alert('Prompt ' + (typeof window !== 'undefined' ? 'is required' : '不能为空'))
       return
     }
 
     if (!selectedModel) {
-      alert('请选择AI模型')
+      alert(t('form.aiModel') + ' ' + (typeof window !== 'undefined' ? 'is required' : '不能为空'))
       return
     }
 
@@ -137,8 +139,8 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
       setVariableValues({})
 
     } catch (error) {
-      console.error('创建批量任务失败:', error)
-      alert('创建批量任务失败: ' + (error instanceof Error ? error.message : '未知错误'))
+      console.error('Batch task creation failed:', error)
+      alert('Batch task creation failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setIsCreating(false)
     }
@@ -214,55 +216,55 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
       {/* 基本信息 */}
       <Card>
         <CardHeader>
-          <CardTitle>批量任务配置</CardTitle>
+          <CardTitle>{t('config.title')}</CardTitle>
           <CardDescription>
-            设置批量任务的基本信息和AI模型
+            {t('config.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="batchName">任务名称 *</Label>
+            <Label htmlFor="batchName">{t('form.taskName')} *</Label>
             <Input
               id="batchName"
               value={batchName}
               onChange={(e) => setBatchName(e.target.value)}
-              placeholder="例如: 职业肖像批量生成"
+              placeholder={t('form.taskNamePlaceholder')}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="batchDescription">任务描述</Label>
+            <Label htmlFor="batchDescription">{t('form.taskDescription')}</Label>
             <Input
               id="batchDescription"
               value={batchDescription}
               onChange={(e) => setBatchDescription(e.target.value)}
-              placeholder="可选：详细描述这个批量任务的目的"
+              placeholder={t('form.taskDescriptionPlaceholder')}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>媒体类型</Label>
+              <Label>{t('form.mediaType')}</Label>
               <select
                 value={taskType}
                 onChange={(e) => setTaskType(e.target.value as MediaType)}
                 className="w-full px-3 py-2 border rounded-md"
               >
-                <option value="image">图片生成</option>
-                <option value="video">视频生成</option>
+                <option value="image">{t('form.imageGeneration')}</option>
+                <option value="video">{t('form.videoGeneration')}</option>
               </select>
             </div>
 
             <div className="space-y-2">
-              <Label>AI模型</Label>
+              <Label>{t('form.aiModel')}</Label>
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md"
                 required
               >
-                <option value="">请选择模型</option>
+                <option value="">{t('form.selectModel')}</option>
                 {AI_MODELS[taskType].map(model => (
                   <option key={model.id} value={model.id}>
                     {model.name} ({model.provider}) - ${model.cost}/次
@@ -280,9 +282,9 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
       {/* 变量编辑器 */}
       <Card>
         <CardHeader>
-          <CardTitle>变量配置</CardTitle>
+          <CardTitle>{t('variables.title')}</CardTitle>
           <CardDescription>
-            定义变量来批量生成不同版本的内容
+            {t('variables.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -299,30 +301,30 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
       {Object.keys(variables).length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>批量预估</CardTitle>
+            <CardTitle>{t('estimate.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{estimatedTasks}</div>
-                <div className="text-sm text-muted-foreground">预估任务数</div>
+                <div className="text-sm text-muted-foreground">{t('estimate.estimatedTasks')}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">${estimatedCost.toFixed(2)}</div>
-                <div className="text-sm text-muted-foreground">预估总成本</div>
+                <div className="text-sm text-muted-foreground">{t('estimate.estimatedCost')}</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-600">
                   {Object.keys(variables).length}
                 </div>
-                <div className="text-sm text-muted-foreground">变量数量</div>
+                <div className="text-sm text-muted-foreground">{t('estimate.variableCount')}</div>
               </div>
             </div>
 
             {estimatedTasks > 10 && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                 <p className="text-sm text-yellow-800">
-                  ⚠️ 注意：这将生成 {estimatedTasks} 个任务，请确认变量配置是否正确
+                  {t('subtasks.warning').replace('{count}', estimatedTasks.toString())}
                 </p>
               </div>
             )}
@@ -337,12 +339,12 @@ export function BatchTaskForm({ onSubmit, onCancel }: BatchTaskFormProps) {
           disabled={!batchName.trim() || !basePrompt.trim() || !selectedModel || isCreating}
           className="flex-1"
         >
-          {isCreating ? '创建中...' : `创建批量任务 (${estimatedTasks} 个子任务)`}
+          {isCreating ? t('form.creating') : t('form.submit').replace('{count}', estimatedTasks.toString())}
         </Button>
 
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel}>
-            取消
+            {t('form.cancel')}
           </Button>
         )}
       </div>
