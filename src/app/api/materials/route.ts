@@ -136,18 +136,15 @@ export async function POST(request: NextRequest) {
       taskId
     }
 
-    // 保存素材
-    materials.set(materialId, material)
-
-    // 更新分类计数
-    const categoryObj = categories.get(category)
-    if (categoryObj) {
-      categoryObj.materialCount++
-    }
+    // 保存到数据库
+    const savedMaterial = await withDatabase(async (db) => {
+      await db.createMaterial(material)
+      return material
+    })
 
     return NextResponse.json({
       success: true,
-      data: material
+      data: savedMaterial
     })
 
   } catch (error) {

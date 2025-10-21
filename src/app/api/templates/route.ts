@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { PromptTemplate, MediaType } from '@/types'
+import { withDatabase } from '@/lib/database'
 
 // 全局模板存储（生产环境应使用数据库）
 declare global {
@@ -286,12 +287,15 @@ export async function POST(request: NextRequest) {
       updatedAt: now
     }
 
-    // 保存模板
-    templates.set(templateId, newTemplate)
+    // 保存到数据库
+    const savedTemplate = await withDatabase(async (db) => {
+      await db.createTemplate(newTemplate)
+      return newTemplate
+    })
 
     return NextResponse.json({
       success: true,
-      data: newTemplate
+      data: savedTemplate
     })
 
   } catch (error) {
