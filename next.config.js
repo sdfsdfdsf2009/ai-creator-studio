@@ -15,9 +15,9 @@ const nextConfig = {
       'img.shields.io'
     ]
   },
-  // 基础路径配置
-  basePath: '/ai-creator-studio',
-  assetPrefix: '/ai-creator-studio/',
+  // 基础路径配置 - 开发环境禁用
+  // basePath: '/ai-creator-studio',
+  // assetPrefix: '/ai-creator-studio/',
   // 环境变量配置
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY || 'default_value',

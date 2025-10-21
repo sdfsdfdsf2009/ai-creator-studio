@@ -1,54 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { Material, MediaType, MaterialCategory } from '@/types'
-
-// 全局素材存储（生产环境应使用数据库）
-declare global {
-  var __materials: Map<string, Material>
-  var __materialCategories: Map<string, MaterialCategory>
-}
-
-if (!global.__materials) {
-  global.__materials = new Map()
-
-  // 初始化一些示例分类
-  const categories = new Map<string, MaterialCategory>()
-  categories.set('default', {
-    id: 'default',
-    name: '默认分类',
-    level: 0,
-    materialCount: 0
-  })
-  categories.set('characters', {
-    id: 'characters',
-    name: '人物角色',
-    level: 0,
-    materialCount: 0
-  })
-  categories.set('landscapes', {
-    id: 'landscapes',
-    name: '风景场景',
-    level: 0,
-    materialCount: 0
-  })
-  categories.set('abstract', {
-    id: 'abstract',
-    name: '抽象艺术',
-    level: 0,
-    materialCount: 0
-  })
-  categories.set('products', {
-    id: 'products',
-    name: '产品展示',
-    level: 0,
-    materialCount: 0
-  })
-
-  global.__materialCategories = categories
-}
-
-const materials = global.__materials
-const categories = global.__materialCategories
+import { withDatabase } from '@/lib/database'
 
 // GET - 获取素材列表
 export async function GET(request: NextRequest) {
@@ -58,82 +11,53 @@ export async function GET(request: NextRequest) {
     // 解析查询参数
     const type = searchParams.get('type') as MediaType | null
     const category = searchParams.get('category')
-    const tags = searchParams.get('tags')?.split(',').filter(Boolean) || []
     const search = searchParams.get('search') || ''
-    const page = parseInt(searchParams.get('page') || '1')
-    const pageSize = parseInt(searchParams.get('pageSize') || '20')
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const pageSize = parseInt(searchParams.get('pageSize') || '20')
+    const page = parseInt(searchParams.get('page') || '1')
 
-    // 过滤素材
-    let filteredMaterials = Array.from(materials.values())
-
-    // 类型过滤
-    if (type && ['image', 'video'].includes(type)) {
-      filteredMaterials = filteredMaterials.filter(m => m.type === type)
-    }
-
-    // 分类过滤
-    if (category) {
-      filteredMaterials = filteredMaterials.filter(m => m.category === category)
-    }
-
-    // 标签过滤
-    if (tags.length > 0) {
-      filteredMaterials = filteredMaterials.filter(m =>
-        tags.some(tag => m.tags.includes(tag))
-      )
-    }
-
-    // 搜索过滤
-    if (search) {
-      const searchLower = search.toLowerCase()
-      filteredMaterials = filteredMaterials.filter(m =>
-        m.name.toLowerCase().includes(searchLower) ||
-        m.description?.toLowerCase().includes(searchLower) ||
-        m.prompt?.toLowerCase().includes(searchLower) ||
-        m.tags.some(tag => tag.toLowerCase().includes(searchLower))
-      )
-    }
-
-    // 排序
-    filteredMaterials.sort((a, b) => {
-      let aValue = a[sortBy as keyof Material]
-      let bValue = b[sortBy as keyof Material]
-
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase()
-        bValue = (bValue as string).toLowerCase()
+    // 从数据库获取素材
+    const result = await withDatabase(async (db) => {
+      const params: any = {
+        sortBy: sortBy === 'createdAt' ? 'created_at' : sortBy,
+        sortOrder: sortOrder.toUpperCase(),
+        pageSize,
+        page
       }
 
-      if (sortOrder === 'desc') {
-        return aValue > bValue ? -1 : 1
-      }
-      return aValue > bValue ? 1 : -1
+      if (type && type !== 'undefined') params.type = type
+      if (category && category !== 'undefined') params.category = category
+      if (search && search !== 'undefined') params.search = search
+
+      return await db.getMaterials(params)
     })
-
-    // 分页
-    const total = filteredMaterials.length
-    const startIndex = (page - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    const paginatedMaterials = filteredMaterials.slice(startIndex, endIndex)
 
     // 获取所有标签
     const allTags = new Set<string>()
-    materials.forEach(material => {
-      material.tags.forEach(tag => allTags.add(tag))
+    result.items.forEach((material: any) => {
+      material.tags?.forEach((tag: string) => allTags.add(tag))
     })
+
+    // 定义默认分类
+    const categories = [
+      { id: 'default', name: '默认分类', level: 0, materialCount: 0 },
+      { id: 'characters', name: '人物角色', level: 0, materialCount: 0 },
+      { id: 'landscapes', name: '风景场景', level: 0, materialCount: 0 },
+      { id: 'abstract', name: '抽象艺术', level: 0, materialCount: 0 },
+      { id: 'products', name: '产品展示', level: 0, materialCount: 0 }
+    ]
 
     return NextResponse.json({
       success: true,
       data: {
-        items: paginatedMaterials,
-        total,
+        items: result.items,
+        total: result.total,
         page,
         pageSize,
-        hasNext: endIndex < total,
+        hasNext: (page * pageSize) < result.total,
         hasPrev: page > 1,
-        categories: Array.from(categories.values()),
+        categories,
         tags: Array.from(allTags)
       }
     })

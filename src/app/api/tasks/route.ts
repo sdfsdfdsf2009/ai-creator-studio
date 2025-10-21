@@ -2,17 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { Task, MediaType, TaskStatus } from '@/types'
 import { feishuAPI } from '@/lib/feishu'
-
-// 全局任务存储，用于API间共享
-declare global {
-  var __tasks: Map<string, Task>
-}
-
-if (!global.__tasks) {
-  global.__tasks = new Map()
-}
-
-const tasks = global.__tasks
+import { withDatabase } from '@/lib/database'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,8 +43,11 @@ export async function POST(request: NextRequest) {
       updatedAt: now
     }
 
-    // 存储任务
-    tasks.set(taskId, task)
+    // 使用数据库存储任务
+    const savedTask = await withDatabase(async (db) => {
+      await db.createTask(task)
+      return task
+    })
 
     // 尝试同步到飞书（可选，失败不影响主要功能）
     try {
@@ -74,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: task
+      data: savedTask
     })
 
   } catch (error) {
@@ -94,32 +87,27 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
 
-    let filteredTasks = Array.from(tasks.values())
+    // 从数据库获取任务
+    const result = await withDatabase(async (db) => {
+      const params: any = {}
+      if (status && status !== 'undefined') params.status = status
+      if (type && type !== 'undefined') params.type = type
+      if (limit && limit > 0) {
+        params.pageSize = limit
+        params.page = Math.floor(offset / limit) + 1
+      }
 
-    // 过滤状态
-    if (status) {
-      filteredTasks = filteredTasks.filter(task => task.status === status)
-    }
-
-    // 过滤类型
-    if (type) {
-      filteredTasks = filteredTasks.filter(task => task.type === type)
-    }
-
-    // 按创建时间倒序排列
-    filteredTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
-    // 分页
-    const paginatedTasks = filteredTasks.slice(offset, offset + limit)
+      return await db.getTasks(params)
+    })
 
     return NextResponse.json({
       success: true,
       data: {
-        items: paginatedTasks,
-        total: filteredTasks.length,
+        items: result.items,
+        total: result.total,
         limit,
         offset,
-        hasMore: offset + limit < filteredTasks.length
+        hasMore: offset + limit < result.total
       }
     })
 
@@ -162,28 +150,28 @@ function calculateCost(type: MediaType, model: string, parameters: any): number 
 
 // 异步处理任务
 async function processTask(taskId: string) {
-  const task = tasks.get(taskId)
-  if (!task) return
-
   try {
     // 更新任务状态为运行中
-    updateTaskStatus(taskId, 'running', 0)
+    await updateTaskStatus(taskId, 'running', 0)
 
     // 使用真实的AI生成服务
     await processWithAI(taskId)
 
     // 更新任务状态为完成
-    updateTaskStatus(taskId, 'completed', 100)
+    await updateTaskStatus(taskId, 'completed', 100)
 
   } catch (error) {
     console.error('Error processing task:', error)
-    updateTaskStatus(taskId, 'failed', 0, error instanceof Error ? error.message : 'Unknown error')
+    await updateTaskStatus(taskId, 'failed', 0, error instanceof Error ? error.message : 'Unknown error')
   }
 }
 
 // 使用真实的AI生成服务
 async function processWithAI(taskId: string) {
-  const task = tasks.get(taskId)
+  const task = await withDatabase(async (db) => {
+    return await db.getTask(taskId)
+  })
+
   if (!task) return
 
   try {
@@ -211,20 +199,20 @@ async function processWithAI(taskId: string) {
       console.log(`图片生成完成，结果数量: ${results.length}`)
 
       // 更新进度 - 图片生成步骤较少
-      updateTaskStatus(taskId, 'running', 50)
+      await updateTaskStatus(taskId, 'running', 50)
 
     } else if (task.type === 'video') {
       console.log(`开始视频生成任务: model=${task.model}`)
       results = await aiService.generateVideo(task.model, task.prompt, task.parameters)
 
       // 更新进度 - 视频生成步骤较多，中间更新
-      updateTaskStatus(taskId, 'running', 30)
+      await updateTaskStatus(taskId, 'running', 30)
       await new Promise(resolve => setTimeout(resolve, 2000))
-      updateTaskStatus(taskId, 'running', 70)
+      await updateTaskStatus(taskId, 'running', 70)
     }
 
     // 保存生成结果
-    updateTaskResults(taskId, results)
+    await updateTaskResults(taskId, results)
 
   } catch (error) {
     console.error('AI generation failed:', error)
@@ -237,7 +225,9 @@ async function processWithAI(taskId: string) {
 
 // 模拟AI生成过程（作为回退选项）
 async function simulateAIGeneration(taskId: string) {
-  const task = tasks.get(taskId)
+  const task = await withDatabase(async (db) => {
+    return await db.getTask(taskId)
+  })
   if (!task) return
 
   const steps = task.type === 'image' ? 5 : 8
@@ -245,13 +235,13 @@ async function simulateAIGeneration(taskId: string) {
 
   for (let i = 1; i <= steps; i++) {
     const progress = (i / steps) * 100
-    updateTaskStatus(taskId, 'running', progress)
+    await updateTaskStatus(taskId, 'running', progress)
     await new Promise(resolve => setTimeout(resolve, delay / steps))
   }
 
   // 生成模拟结果
   const mockResults = generateMockResults(task)
-  updateTaskResults(taskId, mockResults)
+  await updateTaskResults(taskId, mockResults)
 }
 
 // 生成模拟结果
@@ -269,87 +259,86 @@ function generateMockResults(task: Task): string[] {
 }
 
 // 更新任务状态
-function updateTaskStatus(
-  taskId: string, 
-  status: TaskStatus, 
-  progress: number, 
+async function updateTaskStatus(
+  taskId: string,
+  status: TaskStatus,
+  progress: number,
   error?: string
 ) {
-  const task = tasks.get(taskId)
-  if (task) {
-    task.status = status
-    task.progress = progress
-    task.updatedAt = new Date().toISOString()
-    if (error) {
-      task.error = error
+  await withDatabase(async (db) => {
+    const updates: any = {
+      status,
+      progress,
+      updatedAt: new Date().toISOString()
     }
-  }
+    if (error) {
+      updates.error = error
+    }
+    await db.updateTask(taskId, updates)
+  })
 }
 
 // 更新任务结果
 async function updateTaskResults(taskId: string, results: string[]) {
-  const task = tasks.get(taskId)
-  if (!task) return
+  await withDatabase(async (db) => {
+    const task = await db.getTask(taskId)
+    if (!task) return
 
-  task.results = results
-  task.updatedAt = new Date().toISOString()
+    await db.updateTask(taskId, {
+      results,
+      updatedAt: new Date().toISOString()
+    })
 
-  // 自动保存到素材库
-  try {
-    await saveToMaterialLibrary(task, results)
-  } catch (error) {
-    console.warn('Failed to save to material library:', error)
-  }
+    // 自动保存到素材库
+    try {
+      await saveToMaterialLibrary(task, results)
+    } catch (error) {
+      console.warn('Failed to save to material library:', error)
+    }
+  })
 }
 
 // 保存到素材库
 async function saveToMaterialLibrary(task: Task, results: string[]) {
-  // 获取全局素材存储
-  const materials = (global as any).__materials || new Map()
+  await withDatabase(async (db) => {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      const materialId = `material-${Date.now()}-${i}`
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i]
-    const materialId = `material-${Date.now()}-${i}`
+      // 估算文件信息（实际应该从文件获取）
+      const fileInfo = await getFileInfo(result, task.type)
 
-    // 估算文件信息（实际应该从文件获取）
-    const fileInfo = await getFileInfo(result, task.type)
-
-    const material = {
-      id: materialId,
-      name: `${task.prompt.substring(0, 30)}${task.prompt.length > 30 ? '...' : ''} - ${i + 1}`,
-      type: task.type,
-      url: result,
-      thumbnailUrl: task.type === 'image' ? result : undefined,
-      size: fileInfo.size,
-      format: fileInfo.format,
-      width: fileInfo.width,
-      height: fileInfo.height,
-      duration: fileInfo.duration,
-      prompt: task.prompt,
-      model: task.model,
-      tags: extractTagsFromPrompt(task.prompt),
-      category: inferCategoryFromPrompt(task.prompt),
-      description: `由 ${task.model} 生成的${task.type === 'image' ? '图片' : '视频'}`,
-      metadata: {
+      const material = {
+        id: materialId,
+        name: `${task.prompt.substring(0, 30)}${task.prompt.length > 30 ? '...' : ''} - ${i + 1}`,
+        type: task.type,
+        url: result,
+        thumbnailUrl: task.type === 'image' ? result : undefined,
+        size: fileInfo.size,
+        format: fileInfo.format,
+        width: fileInfo.width,
+        height: fileInfo.height,
+        duration: fileInfo.duration,
+        prompt: task.prompt,
+        model: task.model,
+        tags: extractTagsFromPrompt(task.prompt),
+        category: inferCategoryFromPrompt(task.prompt),
+        description: `由 ${task.model} 生成的${task.type === 'image' ? '图片' : '视频'}`,
+        metadata: {
+          taskId: task.id,
+          parameters: task.parameters,
+          cost: task.cost,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         taskId: task.id,
-        parameters: task.parameters,
-        cost: task.cost,
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      taskId: task.id,
+      }
+
+      await db.createMaterial(material)
     }
 
-    materials.set(materialId, material)
-  }
-
-  // 更新全局素材存储
-  if (!(global as any).__materials) {
-    (global as any).__materials = new Map()
-  }
-  ;(global as any).__materials = materials
-
-  console.log(`Saved ${results.length} materials to library`)
+    console.log(`Saved ${results.length} materials to library`)
+  })
 }
 
 // 获取文件信息（模拟）
