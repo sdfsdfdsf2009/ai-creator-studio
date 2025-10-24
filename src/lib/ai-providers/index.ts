@@ -2,8 +2,9 @@
 export interface AIProvider {
   generateImage(prompt: string, options?: ImageGenerationOptions): Promise<string[]>
   generateVideo(prompt: string, options?: VideoGenerationOptions): Promise<string[]>
+  generateText(prompt: string, options?: TextGenerationOptions): Promise<string>
   testConnection(): Promise<boolean>
-  getCostEstimate(type: 'image' | 'video', options?: any): number
+  getCostEstimate(type: 'image' | 'video' | 'text', options?: any): number
 }
 
 export interface ImageGenerationOptions {
@@ -25,6 +26,15 @@ export interface VideoGenerationOptions {
   cameraAngle?: string
   negativePrompt?: string
   seed?: number
+}
+
+export interface TextGenerationOptions {
+  model?: string
+  maxTokens?: number
+  temperature?: number
+  topP?: number
+  frequencyPenalty?: number
+  presencePenalty?: number
 }
 
 // AI 提供商配置

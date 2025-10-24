@@ -17,8 +17,10 @@ export function NavigationClient() {
     { name: t('logo'), href: '/', key: 'logo' },
     { name: t('tasks'), href: '/tasks', key: 'tasks' },
     { name: t('create'), href: '/tasks/create', key: 'create' },
+    { name: t('batchTasks'), href: '/batch-tasks', key: 'batch-tasks' },
     { name: t('library'), href: '/library', key: 'library' },
     { name: t('templates'), href: '/prompts', key: 'templates' },
+    { name: t('evolinkModels'), href: '/settings/evolink-models', key: 'evolink-models' },
     { name: t('analytics'), href: '/analytics', key: 'analytics' },
   ]
 

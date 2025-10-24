@@ -51,6 +51,18 @@ DEBUGGING_RECORD.md
 test-api.js
 simple-start.sh
 
+# Development and test files
+test-*.js
+debug-*.js
+fix-*.js
+simple-*.js
+*.md
+*.sh
+database.sqlite
+tsconfig.tsbuildinfo
+*.bak
+*.backup
+
 # Cache
 .cache/
 .parcel-cache/

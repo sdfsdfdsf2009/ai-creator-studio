@@ -3,6 +3,7 @@ import { OpenAIProvider, OpenAICompatibleProvider } from './openai'
 import { StabilityAIProvider } from './stability'
 import { RunwayProvider, PikaLabsProvider } from './video'
 import { ProxyProvider, proxyProviderManager } from './proxy'
+import { GPT4OProvider } from './gpt4o'
 import { readFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 
@@ -159,20 +160,57 @@ export async function initializeProviders() {
 
 // 模型映射到提供商
 export const modelProviderMap: Record<string, string> = {
+  // OpenAI 模型
   'dall-e-3': 'openai',
   'dall-e-2': 'openai',
+  'sora-1.0': 'openai',
+
+  // Stability AI 模型
+  'stable-diffusion-xl': 'stability-ai',
   'stable-diffusion-xl-1024-v1-0': 'stability-ai',
   'stable-diffusion-xl-1024-v0-9': 'stability-ai',
   'stable-diffusion-512-v2-1': 'stability-ai',
   'stable-diffusion-768-v2-1': 'stability-ai',
+  'stable-diffusion-3': 'stability-ai',
+  'stable-diffusion-2.1': 'stability-ai',
+  'sdxl-turbo': 'stability-ai',
+  'stable-video': 'stability-ai',
   'stable-video-diffusion-img2vid': 'stability-ai',
-  'midjourney-v6': 'custom-ai', // 假设通过自定义 API
-  'midjourney-v5.2': 'custom-ai',
+  'stable-video-xt': 'stability-ai',
+
+  // Flux 模型（通过自定义 API）
   'flux-pro': 'custom-ai',
+  'flux-schnell': 'custom-ai',
+  'flux-dev': 'custom-ai',
+
+  // MidJourney 模型（通过自定义 API）
+  'midjourney-v6': 'custom-ai',
+  'midjourney-v5.2': 'custom-ai',
+
+  // Runway 模型
   'runway-gen3': 'runway',
   'runway-gen2': 'runway',
+  'runway-gen3-turbo': 'runway',
+
+  // Pika 模型
   'pika-labs': 'pika-labs',
-  'gemini-2.5-flash-image': 'proxy', // Nano Banana 通过代理提供商
+  'pika-1.5': 'pika-labs',
+
+  // Nano Banana 代理模型
+  'gemini-2.5-flash-image': 'proxy',
+  'gemini-2.0-pro-image': 'proxy',
+
+  // GPT-4O 模型（通过代理）
+  'gpt-4o': 'proxy',
+  'gpt-4o-mini': 'proxy',
+  'gpt-4o-turbo': 'proxy',
+  'gpt-4o-image': 'proxy',
+
+  // 其他模型（通过自定义 API）
+  'ideogram-2.0': 'custom-ai',
+  'kandinsky-3.0': 'custom-ai',
+  'luma-dream-machine': 'custom-ai',
+  'kling-v1': 'custom-ai',
 }
 
 // 获取模型对应的提供商
@@ -209,74 +247,77 @@ async function loadConfigsFromFile(): Promise<any[]> {
   }
 }
 
-// 初始化代理提供商
+// 初始化代理提供商 - 修复版本（避免token limit错误）
 async function initializeProxyProviders() {
   try {
-    console.log('初始化代理提供商...')
+    console.log('🚀 初始化代理提供商...');
 
-    // 检查环境变量中是否有默认的 Nano Banana 配置
-    if (process.env.NANO_BANANA_API_KEY && process.env.NANO_BANANA_BASE_URL) {
-      const defaultConfig = {
-        id: 'default-nano-banana',
-        name: 'Default Nano Banana',
-        baseUrl: process.env.NANO_BANANA_BASE_URL,
-        apiKey: process.env.NANO_BANANA_API_KEY,
-        textModel: 'gemini-2.5-flash-image',
-        imageModel: 'gemini-2.5-flash-image',
-        maxTokens: 2048,
-        temperature: 0.7,
-        enabled: true,
-        priority: 1
-      }
+    // 从数据库加载代理账户和模型配置
+    const { withDatabase } = await import('@/lib/database')
+    const { proxyAccountManager } = await import('@/lib/proxy-account-manager')
 
-      console.log('使用默认 Nano Banana 配置')
-      proxyProviderManager.updateProviders([defaultConfig])
-      return
-    }
+    await withDatabase(async (db) => {
+      // 获取启用的代理账户
+      const accounts = await db.getProxyAccounts({ enabled: true })
+      console.log(`找到 ${accounts.length} 个启用的代理账户`)
 
-    // 首先尝试从文件加载配置
-    const fileConfigs = await loadConfigsFromFile()
-    if (fileConfigs.length > 0) {
-      console.log(`从文件加载了 ${fileConfigs.length} 个代理配置`)
-      proxyProviderManager.updateProviders(fileConfigs)
-      // 同时更新全局变量
-      ;(global as any).__proxyConfigs = fileConfigs
-      return
-    }
+      // 获取启用的模型配置
+      const modelConfigs = await db.getModelConfigs({ enabled: true })
+      console.log(`找到 ${modelConfigs.length} 个启用的模型配置`)
 
-    // 直接从全局变量读取配置（避免HTTP调用问题）
-    const globalConfigs = (global as any).__proxyConfigs
-    if (globalConfigs && Array.isArray(globalConfigs) && globalConfigs.length > 0) {
-      console.log(`从全局变量加载了 ${globalConfigs.length} 个代理配置`)
-      proxyProviderManager.updateProviders(globalConfigs)
-      return
-    }
+      // 更新代理提供商管理器
+      proxyProviderManager.updateFromAccountsAndConfigs(accounts, modelConfigs)
 
-    // 如果都没有配置，输出警告信息
-    console.log('⚠️ 未找到有效的代理配置，请检查配置文件或重新保存API配置')
+      // 为每个启用的代理账户创建AI提供商
+      for (const account of accounts) {
+        try {
+          const provider = new ProxyProvider({
+            apiKey: account.apiKey,
+            baseUrl: account.baseUrl || 'https://api.openai.com/v1',
+            timeout: 120000,
+            retries: 3
+          })
 
-    // 如果全局变量中没有配置，尝试通过HTTP加载（回退方案）
-    try {
-      const response = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/proxy-config`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
+          // 设置模型配置
+          const accountModelConfigs = modelConfigs.filter(config => config.proxyAccountId === account.id)
+          provider.setModelConfig(accountModelConfigs)
 
-      if (response.ok) {
-        const configs = await response.json()
-        if (Array.isArray(configs) && configs.length > 0) {
-          console.log(`通过HTTP加载了 ${configs.length} 个代理配置`)
-          proxyProviderManager.updateProviders(configs)
+          // 注册到AI注册表
+          aiRegistry.register(
+            account.id!,
+            provider,
+            {
+              apiKey: account.apiKey,
+              baseUrl: account.baseUrl,
+              timeout: 120000,
+              retries: 3
+            }
+          )
+
+          console.log(`✅ 已注册代理提供商: ${account.name}`)
+        } catch (error) {
+          console.warn(`注册代理提供商失败 ${account.name}:`, error)
         }
-      } else {
-        console.log('未找到保存的代理配置')
       }
-    } catch (httpError) {
-      console.log('HTTP加载代理配置失败，跳过')
-    }
+    })
+
+    console.log('✅ 代理提供商初始化完成')
   } catch (error) {
-    console.warn('加载代理配置失败:', error)
+    console.warn('代理提供商初始化失败:', error);
+    // 设置一个空的默认配置，避免系统崩溃
+    const emptyConfig = {
+      id: 'empty-config',
+      name: 'Empty Configuration',
+      baseUrl: '',
+      apiKey: '',
+      textModel: 'gemini-2.5-flash-image',
+      imageModel: 'gemini-2.5-flash-image',
+      maxTokens: 2048,
+      temperature: 0.7,
+      enabled: false,
+      priority: 999
+    };
+
+    proxyProviderManager.updateProviders([emptyConfig]);
   }
 }

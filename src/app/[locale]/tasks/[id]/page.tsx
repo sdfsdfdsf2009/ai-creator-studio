@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -23,17 +24,26 @@ export default function TaskDetailPage() {
 
   const task = taskData?.data
 
-  // 自动刷新运行中的任务
+  const queryClient = useQueryClient()
+
+  // 手动刷新任务数据
+  const refetchTask = () => {
+    if (taskId) {
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    }
+  }
+
+  // 自动刷新运行中和等待中的任务
   useEffect(() => {
-    if (!autoRefresh || task?.status !== 'running') return
+    if (!autoRefresh || !task?.status || !['pending', 'running'].includes(task.status)) return
 
     const interval = setInterval(() => {
-      // refetch 是 useQuery 返回的函数，我们需要重新实现这个逻辑
-      window.location.reload()
-    }, 3000) // 每3秒刷新一次
+      refetchTask()
+    }, 2000) // 每2秒刷新一次，更频繁的更新
 
     return () => clearInterval(interval)
-  }, [autoRefresh, task?.status])
+  }, [autoRefresh, task?.status, taskId])
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {

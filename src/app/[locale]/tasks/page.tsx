@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { ImagePreview } from '@/components/image-preview'
 import { useTasks } from '@/hooks/use-tasks'
 import { useCreateTask, useCancelTask, useDeleteTask } from '@/hooks/use-tasks'
 import { Task, TaskStatus, MediaType } from '@/types'
@@ -18,6 +20,7 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
 
   const { data: tasksData, isLoading, error } = useTasks({
     status: statusFilter !== 'all' ? statusFilter : undefined,
@@ -27,6 +30,23 @@ export default function TasksPage() {
   const createTaskMutation = useCreateTask()
   const cancelTaskMutation = useCancelTask()
   const deleteTaskMutation = useDeleteTask()
+  const queryClient = useQueryClient()
+
+  // 检查是否有运行中的任务
+  const hasRunningTasks = tasksData?.items?.some(task =>
+    ['pending', 'running'].includes(task.status)
+  ) || false
+
+  // 自动刷新运行中和等待中的任务
+  useEffect(() => {
+    if (!hasRunningTasks) return
+
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    }, 3000) // 每3秒刷新任务列表
+
+    return () => clearInterval(interval)
+  }, [hasRunningTasks, queryClient])
 
   // 过滤任务
   const filteredTasks = tasksData?.items?.filter(task =>
@@ -265,7 +285,7 @@ export default function TasksPage() {
                             src={result}
                             alt={`Result ${index + 1}`}
                             className="w-16 h-16 object-cover rounded border cursor-pointer hover:scale-105 transition-transform"
-                            onClick={() => window.open(result, '_blank')}
+                            onClick={() => setPreviewImage(result)}
                           />
                         ) : (
                           <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-center">
@@ -294,6 +314,14 @@ export default function TasksPage() {
           ))
         )}
       </div>
+
+      {/* Image Preview Modal */}
+      <ImagePreview
+        isOpen={!!previewImage}
+        onClose={() => setPreviewImage(null)}
+        imageUrl={previewImage || ''}
+        alt="AI生成的图片"
+      />
     </div>
   )
 }

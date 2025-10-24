@@ -25,33 +25,126 @@ export default function SettingsPageSimple() {
         <h2 className="text-xl font-semibold mb-4">🌐 AI 服务配置</h2>
 
         <div className="space-y-6">
+          {/* 智能代理管理 - 新功能 */}
+          <div className="border border-purple-200 bg-purple-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-purple-800">🌐 智能代理管理</h3>
+                <p className="text-sm text-gray-600">多代理提供商智能路由和负载均衡管理</p>
+              </div>
+              <button
+                onClick={() => window.location.href = '/zh/settings/smart-proxy'}
+                className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition-colors"
+              >
+                管理代理
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">支持多个AI提供商（OpenAI、Anthropic、Google等）</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">智能路由和故障转移机制</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">实时健康监控和性能统计</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">
+                  <span className="font-medium">快速操作：</span>
+                  <button
+                    onClick={() => window.location.href = '/zh/settings/smart-proxy?tab=monitoring'}
+                    className="text-blue-600 hover:text-blue-800 underline ml-1"
+                  >
+                    实时监控
+                  </button>
+                  /
+                  <button
+                    onClick={() => window.location.href = '/zh/settings/smart-proxy?tab=rules'}
+                    className="text-blue-600 hover:text-blue-800 underline ml-1"
+                  >
+                    路由规则
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* API代理配置 - 主要配置 */}
           <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-lg font-medium text-blue-800">🔗 API代理配置</h3>
-                <p className="text-sm text-gray-600">配置中转站API服务，支持多种代理服务</p>
+                <h3 className="text-lg font-medium text-blue-800">🔗 代理账户管理</h3>
+                <p className="text-sm text-gray-600">配置和管理代理服务账户</p>
               </div>
               <button
-                onClick={() => window.location.href = '/zh/settings/api-proxy'}
+                onClick={() => window.location.href = '/zh/settings/proxy-accounts'}
                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
               >
-                配置
+                管理账户
               </button>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">支持多种中转站API服务</span>
+                <span className="text-sm text-gray-700">支持多种代理服务提供商</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">灵活的模型选择和参数配置</span>
+                <span className="text-sm text-gray-700">API连接测试和验证</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">API连接测试功能</span>
+                <span className="text-sm text-gray-700">账户健康状态监控</span>
+              </div>
+            </div>
+          </div>
+
+          {/* EvoLink AI 模型管理 */}
+          <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-medium text-green-800">🤖 EvoLink AI 模型管理</h3>
+                <p className="text-sm text-gray-600">管理EvoLink.AI模型配置、测试连接和预置管理</p>
+              </div>
+              <button
+                onClick={() => window.location.href = '/zh/settings/evolink-models'}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors"
+              >
+                管理模型
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">16个AI模型模板（文本、图像、视频）</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">智能预置管理，一键配置所有模型</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">API连接测试和状态监控</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">
+                  <span className="font-medium">快速操作：</span>
+                  <button
+                    onClick={() => window.location.href = '/zh/settings/evolink-models?tab=preset'}
+                    className="text-blue-600 hover:text-blue-800 underline ml-1"
+                  >
+                    预置管理
+                  </button>
+                </span>
               </div>
             </div>
           </div>

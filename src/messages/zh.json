@@ -9,6 +9,7 @@
     "library": "素材库",
     "templates": "模板",
     "prompts": "模板",
+    "evolinkModels": "EvoLink模型",
     "analytics": "分析",
     "settings": "设置"
   },

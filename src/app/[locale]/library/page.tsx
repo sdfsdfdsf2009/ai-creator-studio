@@ -86,6 +86,48 @@ export default function LibraryPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
+  // 格式化精确时间显示
+  const formatDateTime = (dateString: string) => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+    } catch (error) {
+      return dateString
+    }
+  }
+
+  // 格式化模型名称显示
+  const formatModelName = (model?: string) => {
+    if (!model) return '未知模型'
+    return model
+  }
+
+  // 格式化任务ID显示并支持跳转
+  const formatTaskId = (taskId?: string) => {
+    if (!taskId) return null
+    const shortId = taskId.length > 12 ? `${taskId.substring(0, 8)}...` : taskId
+    return shortId
+  }
+
+  // 处理任务ID点击跳转
+  const handleTaskIdClick = (taskId: string) => {
+    if (taskId.startsWith('batch-')) {
+      // 如果是批量任务ID，跳转到批量任务页面
+      window.location.href = '/batch-tasks'
+    } else {
+      // 如果是单个任务ID，跳转到任务管理页面
+      window.location.href = '/tasks'
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -289,7 +331,32 @@ export default function LibraryPage() {
                       {material.duration && (
                         <div>时长: {material.duration}秒</div>
                       )}
-                      <div>
+
+                      {/* 新增：精确创建时间 */}
+                      <div className="text-blue-600 font-medium">
+                        📅 {formatDateTime(material.createdAt)}
+                      </div>
+
+                      {/* 新增：AI模型信息 */}
+                      {material.model && (
+                        <div className="text-green-600 font-medium">
+                          🤖 模型: {formatModelName(material.model)}
+                        </div>
+                      )}
+
+                      {/* 新增：任务ID */}
+                      {material.taskId && (
+                        <div
+                          className="text-purple-600 font-medium cursor-pointer hover:underline"
+                          onClick={() => handleTaskIdClick(material.taskId)}
+                          title="点击查看任务详情"
+                        >
+                          📋 任务: {formatTaskId(material.taskId)}
+                        </div>
+                      )}
+
+                      {/* 原有：相对时间 */}
+                      <div className="text-gray-500">
                         {formatDistanceToNow(new Date(material.createdAt), {
                           addSuffix: true,
                           locale: zhCN

@@ -166,14 +166,26 @@ export function VariableEditor({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="rawPrompt">Original Prompt</Label>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="rawPrompt">Original Prompt</Label>
+              <div className="text-sm text-muted-foreground">
+                {rawPrompt.length}/2000 字符
+              </div>
+            </div>
             <textarea
               id="rawPrompt"
               value={rawPrompt}
               onChange={(e) => setRawPrompt(e.target.value)}
               placeholder="Example: @occupation:select [doctor,engineer,artist] (profession) @style:text (style) = modern Professional portrait of a {occupation}, {style} style"
-              className="w-full px-3 py-2 border rounded-md h-32 resize-none font-mono text-sm"
+              className={`w-full px-3 py-2 border rounded-md h-32 resize-none font-mono text-sm ${
+                rawPrompt.length > 2000 ? 'border-red-500 focus:ring-red-500' : 'border-input'
+              }`}
             />
+            {rawPrompt.length > 2000 && (
+              <div className="text-sm text-red-500 mt-1">
+                ⚠️ Prompt过长，已自动截断到2000字符。建议缩短Prompt以获得最佳效果。
+              </div>
+            )}
           </div>
 
           {/* 展开的提示词预览 */}

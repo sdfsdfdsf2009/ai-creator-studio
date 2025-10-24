@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Task } from '@/types'
-
-// 导入共享的任务存储 (在实际项目中应该使用数据库)
-// 这里我们需要从主API导入任务存储，为了调试简化，使用全局变量
-declare global {
-  var __tasks: Map<string, Task>
-}
-
-if (!global.__tasks) {
-  global.__tasks = new Map()
-}
+import { withDatabase } from '@/lib/database'
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +8,10 @@ export async function GET(
 ) {
   try {
     const { id } = params
-    const task = global.__tasks.get(id)
+
+    const task = await withDatabase(async (db) => {
+      return await db.getTask(id)
+    })
 
     if (!task) {
       return NextResponse.json(
@@ -40,28 +34,62 @@ export async function GET(
   }
 }
 
-export async function DELETE(
+export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params
-    const task = global.__tasks.get(id)
+    const body = await request.json()
 
-    if (!task) {
+    const updatedTask = await withDatabase(async (db) => {
+      await db.updateTask(id, body)
+      return await db.getTask(id)
+    })
+
+    if (!updatedTask) {
       return NextResponse.json(
         { success: false, error: 'Task not found' },
         { status: 404 }
       )
     }
 
-    // 更新任务状态为已取消
-    task.status = 'cancelled'
-    task.updatedAt = new Date().toISOString()
+    return NextResponse.json({
+      success: true,
+      data: updatedTask
+    })
+
+  } catch (error) {
+    console.error('Error updating task:', error)
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params
+
+    const updatedTask = await withDatabase(async (db) => {
+      await db.updateTask(id, { status: 'cancelled' })
+      return await db.getTask(id)
+    })
+
+    if (!updatedTask) {
+      return NextResponse.json(
+        { success: false, error: 'Task not found' },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({
       success: true,
-      data: task
+      data: updatedTask
     })
 
   } catch (error) {
@@ -82,31 +110,22 @@ export async function POST(
     const body = await request.json()
     const { action } = body
 
-    const task = global.__tasks.get(id)
-    if (!task) {
-      return NextResponse.json(
-        { success: false, error: 'Task not found' },
-        { status: 404 }
-      )
-    }
+    let updateData = {}
 
     switch (action) {
       case 'retry':
         // 重试任务
-        if (task.status === 'failed' || task.status === 'cancelled') {
-          task.status = 'pending'
-          task.progress = 0
-          task.error = undefined
-          task.updatedAt = new Date().toISOString()
-          // 这里应该重新启动任务处理流程
+        updateData = {
+          status: 'pending',
+          progress: 0,
+          error: null
         }
         break
 
       case 'cancel':
         // 取消任务
-        if (task.status === 'pending' || task.status === 'running') {
-          task.status = 'cancelled'
-          task.updatedAt = new Date().toISOString()
+        updateData = {
+          status: 'cancelled'
         }
         break
 
@@ -117,9 +136,21 @@ export async function POST(
         )
     }
 
+    const updatedTask = await withDatabase(async (db) => {
+      await db.updateTask(id, updateData)
+      return await db.getTask(id)
+    })
+
+    if (!updatedTask) {
+      return NextResponse.json(
+        { success: false, error: 'Task not found' },
+        { status: 404 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
-      data: task
+      data: updatedTask
     })
 
   } catch (error) {

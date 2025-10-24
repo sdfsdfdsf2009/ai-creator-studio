@@ -105,35 +105,87 @@ export class AIService {
     await this.ensureInitialized()
 
     const providerName = model in {
+      // OpenAI Models
       'dall-e-3': 'openai',
       'dall-e-2': 'openai',
+
+      // Stability AI Models
       'stable-diffusion-xl-1024-v1-0': 'stability-ai',
       'stable-diffusion-xl-1024-v0-9': 'stability-ai',
       'stable-diffusion-512-v2-1': 'stability-ai',
       'stable-diffusion-768-v2-1': 'stability-ai',
       'stable-video-diffusion-img2vid': 'stability-ai',
+
+      // Custom AI Models
       'midjourney-v6': 'custom-ai',
       'midjourney-v5.2': 'custom-ai',
       'flux-pro': 'custom-ai',
       'runway-gen3': 'custom-ai',
       'runway-gen2': 'custom-ai',
       'pika-labs': 'custom-ai',
+
+      // EvoLink AI Models (Text)
+      'gemini-2.5-flash-text': 'proxy',
+      'gemini-2.5-pro-text': 'proxy',
+      'claude-3.5-sonnet-text': 'proxy',
+      'gpt-4o-text': 'proxy',
+
+      // EvoLink AI Models (Image)
+      'flux-1.1-pro-image': 'proxy',
+      'flux-1.1-dev-image': 'proxy',
+      'flux-schnell-image': 'proxy',
+      'sd-3.5-large-image': 'proxy',
+      'sd-3.5-medium-turbo-image': 'proxy',
+      'sd-3.5-large-turbo-image': 'proxy',
+      'gemini-2.0-pro-image': 'proxy',
       'gemini-2.5-flash-image': 'proxy',
+
+      // EvoLink AI Models (Video)
+      'kling-1.6-video': 'proxy',
+      'kling-1.5-video': 'proxy',
+      'luma-1.6-video': 'proxy',
+      'video-1-video': 'proxy',
     } ? {
+      // OpenAI Models
       'dall-e-3': 'openai',
       'dall-e-2': 'openai',
+
+      // Stability AI Models
       'stable-diffusion-xl-1024-v1-0': 'stability-ai',
       'stable-diffusion-xl-1024-v0-9': 'stability-ai',
       'stable-diffusion-512-v2-1': 'stability-ai',
       'stable-diffusion-768-v2-1': 'stability-ai',
       'stable-video-diffusion-img2vid': 'stability-ai',
+
+      // Custom AI Models
       'midjourney-v6': 'custom-ai',
       'midjourney-v5.2': 'custom-ai',
       'flux-pro': 'custom-ai',
       'runway-gen3': 'custom-ai',
       'runway-gen2': 'custom-ai',
       'pika-labs': 'custom-ai',
+
+      // EvoLink AI Models (Text)
+      'gemini-2.5-flash-text': 'proxy',
+      'gemini-2.5-pro-text': 'proxy',
+      'claude-3.5-sonnet-text': 'proxy',
+      'gpt-4o-text': 'proxy',
+
+      // EvoLink AI Models (Image)
+      'flux-1.1-pro-image': 'proxy',
+      'flux-1.1-dev-image': 'proxy',
+      'flux-schnell-image': 'proxy',
+      'sd-3.5-large-image': 'proxy',
+      'sd-3.5-medium-turbo-image': 'proxy',
+      'sd-3.5-large-turbo-image': 'proxy',
+      'gemini-2.0-pro-image': 'proxy',
       'gemini-2.5-flash-image': 'proxy',
+
+      // EvoLink AI Models (Video)
+      'kling-1.6-video': 'proxy',
+      'kling-1.5-video': 'proxy',
+      'luma-1.6-video': 'proxy',
+      'video-1-video': 'proxy',
     }[model] : undefined
 
     if (!providerName) return 0
@@ -152,14 +204,24 @@ export class AIService {
 
   // 测试模型可用性
   async testModel(model: string): Promise<boolean> {
+    console.log(`🔍 开始测试模型可用性: ${model}`)
     await this.ensureInitialized()
 
     const provider = getProviderForModel(model)
-    if (!provider) return false
+    if (!provider) {
+      console.log(`❌ 找不到模型 ${model} 的提供商`)
+      return false
+    }
+
+    console.log(`✅ 找到模型 ${model} 的提供商`)
 
     try {
-      return await provider.testConnection()
+      console.log(`📞 开始测试提供商连接...`)
+      const result = await provider.testConnection()
+      console.log(`📊 模型 ${model} 连接测试结果: ${result}`)
+      return result
     } catch (error) {
+      console.error(`❌ 模型 ${model} 连接测试异常:`, error)
       return false
     }
   }

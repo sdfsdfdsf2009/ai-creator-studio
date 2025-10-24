@@ -195,11 +195,41 @@ async function processWithAI(taskId: string) {
         throw new Error(`模型 ${task.model} 不可用，请检查代理配置`)
       }
 
-      results = await aiService.generateImage(task.model, task.prompt, task.parameters)
-      console.log(`图片生成完成，结果数量: ${results.length}`)
+      // 获取要生成的图片数量
+      const quantity = task.parameters?.quantity || 1
+      console.log(`开始图片生成任务: model=${task.model}, quantity=${quantity}, prompt="${task.prompt.substring(0, 50)}..."`)
 
-      // 更新进度 - 图片生成步骤较少
-      await updateTaskStatus(taskId, 'running', 50)
+      // 多次调用API生成多张图片
+      results = []
+      for (let i = 0; i < quantity; i++) {
+        try {
+          console.log(`生成第 ${i + 1}/${quantity} 张图片...`)
+
+          // 为每张图片使用不同的seed确保多样性（如果支持的话）
+          const imageParameters = {
+            ...task.parameters,
+            seed: task.parameters?.seed ? task.parameters.seed + i : undefined,
+            // 每次只生成1张，让API调用次数等于quantity
+            quantity: 1
+          }
+
+          const imageResults = await aiService.generateImage(task.model, task.prompt, imageParameters)
+          results.push(...imageResults)
+
+          console.log(`第 ${i + 1} 张图片生成完成，获得 ${imageResults.length} 张图片`)
+
+          // 更新进度 - 基于已完成的图片数量
+          const progress = Math.round(((i + 1) / quantity) * 80) // 80%用于生成，20%用于最终处理
+          await updateTaskStatus(taskId, 'running', progress)
+
+        } catch (error) {
+          console.error(`第 ${i + 1} 张图片生成失败:`, error)
+          // 单张图片失败不影响其他图片，继续生成剩余的
+          // 可以选择重试或跳过，这里选择跳过并记录错误
+        }
+      }
+
+      console.log(`所有图片生成完成，共获得 ${results.length} 张图片（要求: ${quantity} 张）`)
 
     } else if (task.type === 'video') {
       console.log(`开始视频生成任务: model=${task.model}`)
@@ -217,9 +247,10 @@ async function processWithAI(taskId: string) {
   } catch (error) {
     console.error('AI generation failed:', error)
 
-    // 如果AI服务不可用，回退到模拟生成
-    console.warn('Falling back to mock generation due to AI service error')
-    await simulateAIGeneration(taskId)
+    // 不再降级到模拟生成，强制使用真实API
+    // 如果失败，将任务标记为失败状态
+    await updateTaskStatus(taskId, 'failed', 0, `AI generation failed: ${error}`)
+    throw error
   }
 }
 

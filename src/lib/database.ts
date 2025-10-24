@@ -2,6 +2,8 @@ import sqlite3 from 'sqlite3'
 import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
+import { v4 as uuidv4 } from 'uuid'
+import { randomUUID } from 'crypto'
 
 // 数据库接口定义
 export interface Database {
@@ -52,6 +54,42 @@ export interface Database {
   clearExpiredCache(): Promise<number>
   getCacheStats(): Promise<any>
 
+  // 代理账号相关
+  createProxyAccount(account: any): Promise<any>
+  getProxyAccount(id: string): Promise<any>
+  getProxyAccounts(params?: any): Promise<any[]>
+  updateProxyAccount(id: string, updates: any): Promise<any>
+  deleteProxyAccount(id: string): Promise<boolean>
+
+  // 模型配置相关
+  createModelConfig(config: any): Promise<any>
+  getModelConfig(id: string): Promise<any>
+  getModelConfigs(params?: any): Promise<any[]>
+  updateModelConfig(id: string, updates: any): Promise<any>
+  deleteModelConfig(id: string): Promise<boolean>
+
+  // API端点相关
+  createApiEndpoint(endpoint: any): Promise<any>
+  getApiEndpoints(params?: any): Promise<any[]>
+  getApiEndpoint(id: string): Promise<any>
+  getApiEndpointsByProvider(provider: string): Promise<any[]>
+  updateApiEndpoint(id: string, updates: any): Promise<any>
+  deleteApiEndpoint(id: string): Promise<boolean>
+
+  // 路由规则相关
+  createRoutingRule(rule: any): Promise<any>
+  getRoutingRule(id: string): Promise<any>
+  getRoutingRules(params?: any): Promise<any[]>
+  updateRoutingRule(id: string, updates: any): Promise<any>
+  deleteRoutingRule(id: string): Promise<boolean>
+
+  // 成本阈值相关
+  createCostThreshold(threshold: any): Promise<any>
+  getCostThreshold(id: string): Promise<any>
+  getCostThresholds(params?: any): Promise<any[]>
+  updateCostThreshold(id: string, updates: any): Promise<any>
+  deleteCostThreshold(id: string): Promise<boolean>
+
   // 关闭连接
   close(): Promise<void>
 }
@@ -63,6 +101,10 @@ class SQLiteDatabase implements Database {
   constructor(dbPath: string) {
     this.db = new sqlite3.Database(dbPath)
     this.ready = this.initialize()
+  }
+
+  private generateId(): string {
+    return uuidv4()
   }
 
   private async initialize(): Promise<void> {
@@ -214,6 +256,173 @@ class SQLiteDatabase implements Database {
       await run('CREATE INDEX IF NOT EXISTS idx_cache_entries_media_type ON cache_entries (media_type)')
       await run('CREATE INDEX IF NOT EXISTS idx_cache_entries_accessed_at ON cache_entries (accessed_at)')
       await run('CREATE INDEX IF NOT EXISTS idx_cache_entries_expires_at ON cache_entries (expires_at)')
+
+      // 创建代理账号表（扩展支持多提供商）
+      await run(`
+        CREATE TABLE IF NOT EXISTS proxy_accounts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          provider TEXT NOT NULL,
+          provider_type TEXT NOT NULL DEFAULT 'api', -- 'api', 'oauth', 'webhook'
+          api_key TEXT,
+          api_secret TEXT, -- For OAuth
+          base_url TEXT,
+          region TEXT, -- 地理区域：'us', 'eu', 'asia', 'global'
+          priority INTEGER DEFAULT 100, -- 优先级，数字越小优先级越高
+          enabled INTEGER DEFAULT 1,
+          health_status TEXT DEFAULT 'unknown', -- 'healthy', 'unhealthy', 'unknown'
+          last_health_check TEXT,
+          performance_metrics TEXT, -- JSON: {avg_response_time, success_rate, total_requests}
+          capabilities TEXT, -- JSON: {supported_media_types, supported_models}
+          rate_limits TEXT, -- JSON: {requests_per_minute, tokens_per_minute}
+          authentication_type TEXT DEFAULT 'api_key', -- 'api_key', 'oauth', 'bearer'
+          settings TEXT, -- JSON object
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_proxy_accounts_provider ON proxy_accounts (provider)')
+      await run('CREATE INDEX IF NOT EXISTS idx_proxy_accounts_provider_type ON proxy_accounts (provider_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_proxy_accounts_enabled ON proxy_accounts (enabled)')
+      await run('CREATE INDEX IF NOT EXISTS idx_proxy_accounts_priority ON proxy_accounts (priority)')
+      await run('CREATE INDEX IF NOT EXISTS idx_proxy_accounts_region ON proxy_accounts (region)')
+
+      // 创建模型配置表（扩展支持多代理映射）
+      await run(`
+        CREATE TABLE IF NOT EXISTS model_configs (
+          id TEXT PRIMARY KEY,
+          model_name TEXT NOT NULL,
+          proxy_account_id TEXT, -- 主代理
+          fallback_accounts TEXT, -- JSON array: [{id: 'xxx', priority: 1}, {id: 'yyy', priority: 2}]
+          media_type TEXT NOT NULL, -- 'image', 'video', 'text'
+          cost REAL DEFAULT 0,
+          cost_optimization TEXT, -- JSON: {batch_discount, volume_pricing, time_based_pricing}
+          enabled INTEGER DEFAULT 1,
+          auto_failover INTEGER DEFAULT 0, -- 是否启用自动故障转移
+          performance_stats TEXT, -- JSON: {avg_response_time, success_rate, total_requests}
+          routing_preferences TEXT, -- JSON: {primary_priority, cost_weight, performance_weight}
+          settings TEXT, -- JSON object
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (proxy_account_id) REFERENCES proxy_accounts(id) ON DELETE SET NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_model_configs_model_name ON model_configs (model_name)')
+      await run('CREATE INDEX IF NOT EXISTS idx_model_configs_media_type ON model_configs (media_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_model_configs_proxy_account_id ON model_configs (proxy_account_id)')
+      await run('CREATE INDEX IF NOT EXISTS idx_model_configs_enabled ON model_configs (enabled)')
+      await run('CREATE INDEX IF NOT EXISTS idx_model_configs_auto_failover ON model_configs (auto_failover)')
+
+      // 创建EvoLink.AI模型模板表
+      await run(`
+        CREATE TABLE IF NOT EXISTS evolink_model_templates (
+          id TEXT PRIMARY KEY,
+          model_id TEXT NOT NULL UNIQUE,
+          model_name TEXT NOT NULL,
+          media_type TEXT NOT NULL, -- 'text', 'image', 'video'
+          cost_per_request REAL DEFAULT 0,
+          description TEXT,
+          enabled INTEGER DEFAULT 1,
+          is_builtin INTEGER DEFAULT 0, -- 是否为内置模型
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_evolink_templates_model_id ON evolink_model_templates (model_id)')
+      await run('CREATE INDEX IF NOT EXISTS idx_evolink_templates_media_type ON evolink_model_templates (media_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_evolink_templates_enabled ON evolink_model_templates (enabled)')
+      await run('CREATE INDEX IF NOT EXISTS idx_evolink_templates_builtin ON evolink_model_templates (is_builtin)')
+
+      // 创建用户自定义EvoLink.AI模型配置表
+      await run(`
+        CREATE TABLE IF NOT EXISTS user_evolink_models (
+          id TEXT PRIMARY KEY,
+          template_id TEXT,
+          model_id TEXT NOT NULL,
+          display_name TEXT NOT NULL,
+          media_type TEXT NOT NULL,
+          cost_per_request REAL DEFAULT 0,
+          proxy_account_id TEXT,
+          enabled INTEGER DEFAULT 1,
+          tested INTEGER DEFAULT 0, -- 是否已测试
+          last_tested_at TEXT,
+          test_result TEXT, -- JSON格式存储测试结果
+          settings TEXT, -- JSON格式存储额外设置
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (template_id) REFERENCES evolink_model_templates(id) ON DELETE SET NULL,
+          FOREIGN KEY (proxy_account_id) REFERENCES proxy_accounts(id) ON DELETE SET NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_user_evolink_model_id ON user_evolink_models (model_id)')
+      await run('CREATE INDEX IF NOT EXISTS idx_user_evolink_proxy_account_id ON user_evolink_models (proxy_account_id)')
+      await run('CREATE INDEX IF NOT EXISTS idx_user_evolink_media_type ON user_evolink_models (media_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_user_evolink_enabled ON user_evolink_models (enabled)')
+      await run('CREATE INDEX IF NOT EXISTS idx_user_evolink_tested ON user_evolink_models (tested)')
+
+      // 创建路由规则配置表
+      await run(`
+        CREATE TABLE IF NOT EXISTS routing_rules (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          priority INTEGER DEFAULT 100,
+          enabled INTEGER DEFAULT 1,
+          conditions TEXT,
+          target_proxy_account_id TEXT,
+          action TEXT DEFAULT 'route',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_routing_rules_target_proxy ON routing_rules (target_proxy_account_id)')
+      await run('CREATE INDEX IF NOT EXISTS idx_routing_rules_priority ON routing_rules (priority)')
+      await run('CREATE INDEX IF NOT EXISTS idx_routing_rules_enabled ON routing_rules (enabled)')
+
+      // 创建成本阈值配置表
+      await run(`
+        CREATE TABLE IF NOT EXISTS cost_thresholds (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          threshold_type TEXT DEFAULT 'daily',
+          threshold_value REAL NOT NULL,
+          currency TEXT DEFAULT 'USD',
+          period TEXT DEFAULT 'daily',
+          enabled INTEGER DEFAULT 1,
+          alert_email TEXT,
+          alert_webhook TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_cost_thresholds_type ON cost_thresholds (threshold_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_cost_thresholds_enabled ON cost_thresholds (enabled)')
+      await run('CREATE INDEX IF NOT EXISTS idx_cost_thresholds_value ON cost_thresholds (threshold_value)')
+
+      // 创建API端点配置表
+      await run(`
+        CREATE TABLE IF NOT EXISTS api_endpoints (
+          id TEXT PRIMARY KEY,
+          provider TEXT NOT NULL, -- 'evolink', 'openai', etc.
+          media_type TEXT NOT NULL, -- 'text', 'image', 'video'
+          endpoint_url TEXT NOT NULL,
+          description TEXT,
+          enabled INTEGER DEFAULT 1,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `)
+
+      await run('CREATE INDEX IF NOT EXISTS idx_api_endpoints_provider ON api_endpoints (provider)')
+      await run('CREATE INDEX IF NOT EXISTS idx_api_endpoints_media_type ON api_endpoints (media_type)')
+      await run('CREATE INDEX IF NOT EXISTS idx_api_endpoints_enabled ON api_endpoints (enabled)')
 
       console.log('Database initialized successfully')
     } catch (error) {
@@ -385,6 +594,46 @@ class SQLiteDatabase implements Database {
         fields.push('parameters = ?')
         values.push(JSON.stringify(value))
       } else if (key === 'createdAt' || key === 'updatedAt') {
+        fields.push(`${key.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?`)
+        values.push(value)
+      } else if (key === 'batchId') {
+        fields.push('batch_id = ?')
+        values.push(value)
+      } else if (key === 'parentTaskId') {
+        fields.push('parent_task_id = ?')
+        values.push(value)
+      } else if (key === 'variableValues') {
+        fields.push('variable_values = ?')
+        values.push(JSON.stringify(value))
+      } else if (key === 'isBatchRoot') {
+        fields.push('is_batch_root = ?')
+        values.push(value)
+      } else if (key === 'batchIndex') {
+        fields.push('batch_index = ?')
+        values.push(value)
+      } else if (key === 'error') {
+        fields.push('error = ?')
+        values.push(value)
+      } else if (key === 'cost') {
+        fields.push('cost = ?')
+        values.push(value)
+      } else if (key === 'model') {
+        fields.push('model = ?')
+        values.push(value)
+      } else if (key === 'prompt') {
+        fields.push('prompt = ?')
+        values.push(value)
+      } else if (key === 'type') {
+        fields.push('type = ?')
+        values.push(value)
+      } else if (key === 'progress') {
+        fields.push('progress = ?')
+        values.push(value)
+      } else if (key === 'status') {
+        fields.push('status = ?')
+        values.push(value)
+      } else {
+        // 默认处理：转换为 snake_case
         fields.push(`${key.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?`)
         values.push(value)
       }
@@ -1215,6 +1464,1009 @@ class SQLiteDatabase implements Database {
         return acc
       }, {})
     }
+  }
+
+  
+  
+  
+  
+  // 代理账号相关方法
+  async createProxyAccount(account: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    try {
+      // 验证必填字段
+      if (!account.name || !account.provider || !account.apiKey) {
+        throw new Error('Missing required fields: name, provider, apiKey')
+      }
+
+      const stmt = `
+        INSERT INTO proxy_accounts (
+          id, name, provider, api_key, base_url, enabled, settings,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+
+      const now = new Date().toISOString()
+      const id = account.id || this.generateId()
+
+      // 安全的JSON序列化
+      let settingsStr
+      try {
+        settingsStr = JSON.stringify(account.settings || {})
+      } catch (jsonError) {
+        console.error('Failed to serialize settings:', jsonError)
+        settingsStr = '{}'
+      }
+
+      // 确保布尔值转换正确
+      const enabledValue = typeof account.enabled === 'boolean'
+        ? (account.enabled ? 1 : 0)
+        : (account.enabled === 1 ? 1 : 0)
+
+      console.log('Creating proxy account:', {
+        id,
+        name: account.name,
+        provider: account.provider,
+        hasApiKey: !!account.apiKey,
+        baseUrl: account.baseUrl,
+        enabled: enabledValue
+      })
+
+      await run(stmt, [
+        id,
+        account.name?.trim(),
+        account.provider?.trim(),
+        account.apiKey?.trim(),
+        account.baseUrl?.trim() || null,
+        enabledValue,
+        settingsStr,
+        now,
+        now
+      ])
+
+      console.log('Proxy account created successfully:', id)
+      return this.getProxyAccount(id)
+
+    } catch (error) {
+      console.error('Error creating proxy account:', {
+        error: error.message,
+        stack: error.stack,
+        account: {
+          name: account.name,
+          provider: account.provider,
+          hasApiKey: !!account.apiKey,
+          baseUrl: account.baseUrl,
+          enabled: account.enabled
+        }
+      })
+      throw new Error(`Failed to create proxy account: ${error.message}`)
+    }
+  }
+
+  async getProxyAccount(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+    const row = await get('SELECT * FROM proxy_accounts WHERE id = ?', [id])
+    if (!row) return null
+
+    return {
+      id: row.id,
+      name: row.name,
+      provider: row.provider,
+      apiKey: row.api_key,
+      baseUrl: row.base_url,
+      enabled: row.enabled === 1,
+      settings: JSON.parse(row.settings || '{}'),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async getProxyAccounts(params?: any): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    let query = 'SELECT * FROM proxy_accounts'
+    const values: any[] = []
+
+    if (params?.enabled !== undefined) {
+      query += ' WHERE enabled = ?'
+      values.push(params.enabled ? 1 : 0)
+    }
+
+    if (params?.provider) {
+      query += (values.length > 0 ? ' AND' : ' WHERE') + ' provider = ?'
+      values.push(params.provider)
+    }
+
+    query += ' ORDER BY created_at DESC'
+
+    const rows = await all(query, values)
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      provider: row.provider,
+      apiKey: row.api_key,
+      baseUrl: row.base_url,
+      enabled: row.enabled === 1,
+      settings: JSON.parse(row.settings || '{}'),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateProxyAccount(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!id) {
+          throw new Error('Account ID is required for update')
+        }
+
+        const fields: string[] = []
+        const values: any[] = []
+
+        console.log('Updating proxy account:', { id, updates })
+
+        Object.entries(updates).forEach(([key, value]) => {
+          if (key === 'id') return
+
+          console.log(`Processing field: ${key} = ${JSON.stringify(value)}`)
+
+          if (key === 'name') {
+            if (value !== undefined && value !== null) {
+              fields.push('name = ?')
+              values.push(value?.trim())
+            }
+          } else if (key === 'provider') {
+            if (value !== undefined && value !== null && value.trim() !== '') {
+              fields.push('provider = ?')
+              values.push(value?.trim())
+            }
+          } else if (key === 'apiKey') {
+            if (value !== undefined && value !== null) {
+              fields.push('api_key = ?')
+              values.push(value?.trim())
+            }
+          } else if (key === 'baseUrl') {
+            fields.push('base_url = ?')
+            values.push(value?.trim() || null)
+          } else if (key === 'enabled') {
+            // 更安全的布尔值处理
+            const enabledValue = typeof value === 'boolean'
+              ? (value ? 1 : 0)
+              : (value === 1 ? 1 : 0)
+            fields.push('enabled = ?')
+            values.push(enabledValue)
+          } else if (key === 'settings') {
+            // 安全的JSON序列化
+            let settingsStr
+            try {
+              settingsStr = JSON.stringify(value || {})
+            } catch (jsonError) {
+              console.error('Failed to serialize settings:', jsonError)
+              settingsStr = '{}'
+            }
+            fields.push('settings = ?')
+            values.push(settingsStr)
+          }
+        })
+
+        if (fields.length === 0) {
+          throw new Error('No valid fields to update')
+        }
+
+        fields.push('updated_at = ?')
+        values.push(new Date().toISOString())
+        values.push(id)
+
+        const stmt = `UPDATE proxy_accounts SET ${fields.join(', ')} WHERE id = ?`
+
+        console.log('Executing SQL:', stmt)
+        console.log('Parameters:', values)
+
+        // 在外部保存this引用，以便在回调中使用
+        const self = this
+
+        this.db.run(stmt, values, function(error) {
+          if (error) {
+            console.error('SQL execution error:', error)
+            reject(new Error(`Failed to update proxy account: ${error.message}`))
+            return
+          }
+
+          // 在回调函数中，this指向语句对象，包含changes属性
+          const changes = this.changes || 0
+          console.log('SQL execution result:', { changes, lastID: this.lastID })
+
+          if (changes === 0) {
+            reject(new Error(`Proxy account not found: ${id}`))
+            return
+          }
+
+          console.log('Proxy account updated successfully:', id, `Changes: ${changes}`)
+
+          // 异步获取更新后的记录 - 使用外部保存的self引用
+          self.getProxyAccount(id).then(resolve).catch(reject)
+        })
+
+      } catch (error) {
+        console.error('Error updating proxy account:', {
+          error: error.message,
+          stack: error.stack,
+          id,
+          updates
+        })
+        reject(new Error(`Failed to update proxy account: ${error.message}`))
+      }
+    })
+  }
+
+  async deleteProxyAccount(id: string): Promise<boolean> {
+    await this.ensureReady()
+
+    return new Promise((resolve, reject) => {
+      this.db.run('DELETE FROM proxy_accounts WHERE id = ?', [id], function(error) {
+        if (error) {
+          console.error('SQL execution error:', error)
+          reject(error)
+          return
+        }
+
+        // 在回调函数中，this指向语句对象，包含changes属性
+        const changes = this.changes || 0
+        console.log('Delete operation result:', { changes })
+        resolve(changes > 0)
+      })
+    })
+  }
+
+  // 模型配置相关方法
+  async createModelConfig(config: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const stmt = `
+      INSERT INTO model_configs (
+        id, model_name, proxy_account_id, media_type, cost, enabled, settings,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    const now = new Date().toISOString()
+    const id = config.id || this.generateId()
+
+    await run(stmt, [
+      id,
+      config.modelName,
+      config.proxyAccountId || null,
+      config.mediaType,
+      config.cost || 0,
+      config.enabled ? 1 : 0,
+      JSON.stringify(config.settings || {}),
+      now,
+      now
+    ])
+
+    return this.getModelConfig(id)
+  }
+
+  async getModelConfig(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+    const row = await get(`
+      SELECT mc.*, pa.name as proxy_account_name, pa.provider as proxy_provider
+      FROM model_configs mc
+      LEFT JOIN proxy_accounts pa ON mc.proxy_account_id = pa.id
+      WHERE mc.id = ?
+    `, [id])
+
+    if (!row) return null
+
+    return {
+      id: row.id,
+      modelName: row.model_name,
+      proxyAccountId: row.proxy_account_id,
+      proxyAccountName: row.proxy_account_name,
+      proxyProvider: row.proxy_provider,
+      mediaType: row.media_type,
+      cost: row.cost,
+      enabled: row.enabled === 1,
+      settings: JSON.parse(row.settings || '{}'),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async getModelConfigs(params?: any): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    let query = `
+      SELECT mc.*, pa.name as proxy_account_name, pa.provider as proxy_provider
+      FROM model_configs mc
+      LEFT JOIN proxy_accounts pa ON mc.proxy_account_id = pa.id
+    `
+    const values: any[] = []
+    const whereConditions: string[] = []
+
+    if (params?.enabled !== undefined) {
+      whereConditions.push('mc.enabled = ?')
+      values.push(params.enabled ? 1 : 0)
+    }
+
+    if (params?.mediaType) {
+      whereConditions.push('mc.media_type = ?')
+      values.push(params.mediaType)
+    }
+
+    if (params?.proxyAccountId) {
+      whereConditions.push('mc.proxy_account_id = ?')
+      values.push(params.proxyAccountId)
+    }
+
+    if (whereConditions.length > 0) {
+      query += ' WHERE ' + whereConditions.join(' AND ')
+    }
+
+    query += ' ORDER BY mc.created_at DESC'
+
+    const rows = await all(query, values)
+    return rows.map(row => ({
+      id: row.id,
+      modelName: row.model_name,
+      proxyAccountId: row.proxy_account_id,
+      proxyAccountName: row.proxy_account_name,
+      proxyProvider: row.proxy_provider,
+      mediaType: row.media_type,
+      cost: row.cost,
+      enabled: row.enabled === 1,
+      settings: JSON.parse(row.settings || '{}'),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateModelConfig(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const fields: string[] = []
+    const values: any[] = []
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (key === 'id') return
+
+      if (key === 'modelName') {
+        fields.push('model_name = ?')
+        values.push(value)
+      } else if (key === 'proxyAccountId') {
+        fields.push('proxy_account_id = ?')
+        values.push(value)
+      } else if (key === 'mediaType') {
+        fields.push('media_type = ?')
+        values.push(value)
+      } else if (key === 'cost') {
+        fields.push('cost = ?')
+        values.push(value)
+      } else if (key === 'enabled') {
+        fields.push('enabled = ?')
+        values.push(value ? 1 : 0)
+      } else if (key === 'settings') {
+        fields.push('settings = ?')
+        values.push(JSON.stringify(value))
+      }
+    })
+
+    fields.push('updated_at = ?')
+    values.push(new Date().toISOString())
+    values.push(id)
+
+    const stmt = `UPDATE model_configs SET ${fields.join(', ')} WHERE id = ?`
+    await run(stmt, values)
+
+    return this.getModelConfig(id)
+  }
+
+  async deleteModelConfig(id: string): Promise<boolean> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+    const result = await run('DELETE FROM model_configs WHERE id = ?', [id])
+    return (result.changes || 0) > 0
+  }
+
+  // EvoLink.AI模型模板相关方法
+  async createEvoLinkTemplate(template: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const stmt = `
+      INSERT INTO evolink_model_templates (
+        id, model_id, model_name, media_type, cost_per_request, description,
+        enabled, is_builtin, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    await run(stmt, [
+      template.id,
+      template.modelId,
+      template.modelName,
+      template.mediaType,
+      template.costPerRequest || 0,
+      template.description || null,
+      template.enabled !== false ? 1 : 0,
+      template.is_builtin ? 1 : 0,
+      template.createdAt,
+      template.updatedAt
+    ])
+
+    return template
+  }
+
+  async getEvoLinkTemplates(): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all('SELECT * FROM evolink_model_templates ORDER BY media_type, model_name')
+    return rows.map(row => ({
+      id: row.id,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      description: row.description,
+      enabled: row.enabled === 1,
+      is_builtin: row.is_builtin === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async getEvoLinkTemplatesByMediaType(mediaType: string): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all(
+      'SELECT * FROM evolink_model_templates WHERE media_type = ? AND enabled = 1 ORDER BY model_name',
+      [mediaType]
+    )
+    return rows.map(row => ({
+      id: row.id,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      description: row.description,
+      enabled: row.enabled === 1,
+      is_builtin: row.is_builtin === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateEvoLinkTemplate(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const setClause = []
+    const values = []
+
+    Object.keys(updates).forEach(key => {
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+      setClause.push(`${dbKey} = ?`)
+      values.push(updates[key])
+    })
+
+    setClause.push('updated_at = ?')
+    values.push(new Date().toISOString())
+    values.push(id)
+
+    await run(
+      `UPDATE evolink_model_templates SET ${setClause.join(', ')} WHERE id = ?`,
+      values
+    )
+
+    return this.getEvoLinkTemplate(id)
+  }
+
+  async getEvoLinkTemplate(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+
+    const row = await get('SELECT * FROM evolink_model_templates WHERE id = ?', [id])
+    if (!row) return null
+
+    return {
+      id: row.id,
+      modelId: row.model_id,
+      modelName: row.model_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      description: row.description,
+      enabled: row.enabled === 1,
+      is_builtin: row.is_builtin === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async deleteEvoLinkTemplate(id: string): Promise<boolean> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const result = await run('DELETE FROM evolink_model_templates WHERE id = ?', [id])
+    return (result as any).changes > 0
+  }
+
+  // 用户自定义EvoLink.AI模型相关方法
+  async createUserEvoLinkModel(model: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const stmt = `
+      INSERT INTO user_evolink_models (
+        id, template_id, model_id, display_name, media_type, cost_per_request,
+        proxy_account_id, enabled, tested, last_tested_at, test_result, settings,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    await run(stmt, [
+      model.id,
+      model.templateId || null,
+      model.modelId,
+      model.displayName,
+      model.mediaType,
+      model.costPerRequest || 0,
+      model.proxyAccountId || null,
+      model.enabled !== false ? 1 : 0,
+      model.tested ? 1 : 0,
+      model.lastTestedAt || null,
+      model.testResult ? JSON.stringify(model.testResult) : null,
+      model.settings ? JSON.stringify(model.settings) : null,
+      model.createdAt,
+      model.updatedAt
+    ])
+
+    return model
+  }
+
+  async getUserEvoLinkModels(): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all(`
+      SELECT u.*, pa.name as proxy_account_name
+      FROM user_evolink_models u
+      LEFT JOIN proxy_accounts pa ON u.proxy_account_id = pa.id
+      ORDER BY u.media_type, u.display_name
+    `)
+    return rows.map(row => ({
+      id: row.id,
+      templateId: row.template_id,
+      modelId: row.model_id,
+      displayName: row.display_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      proxyAccountId: row.proxy_account_id,
+      proxyAccountName: row.proxy_account_name,
+      enabled: row.enabled === 1,
+      tested: row.tested === 1,
+      lastTestedAt: row.last_tested_at,
+      testResult: row.test_result ? JSON.parse(row.test_result) : null,
+      settings: row.settings ? JSON.parse(row.settings) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async getUserEvoLinkModelsByAccount(proxyAccountId: string): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all(
+      'SELECT * FROM user_evolink_models WHERE proxy_account_id = ? AND enabled = 1 ORDER BY media_type, display_name',
+      [proxyAccountId]
+    )
+    return rows.map(row => ({
+      id: row.id,
+      templateId: row.template_id,
+      modelId: row.model_id,
+      displayName: row.display_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      proxyAccountId: row.proxy_account_id,
+      enabled: row.enabled === 1,
+      tested: row.tested === 1,
+      lastTestedAt: row.last_tested_at,
+      testResult: row.test_result ? JSON.parse(row.test_result) : null,
+      settings: row.settings ? JSON.parse(row.settings) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateUserEvoLinkModel(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const setClause = []
+    const values = []
+
+    Object.keys(updates).forEach(key => {
+      const dbKey = key.replace(/([A-Z])/g, '_$1').toLowerCase()
+      let value = updates[key]
+      if (key === 'testResult' || key === 'settings') {
+        value = value ? JSON.stringify(value) : null
+      }
+      setClause.push(`${dbKey} = ?`)
+      values.push(value)
+    })
+
+    setClause.push('updated_at = ?')
+    values.push(new Date().toISOString())
+    values.push(id)
+
+    await run(
+      `UPDATE user_evolink_models SET ${setClause.join(', ')} WHERE id = ?`,
+      values
+    )
+
+    return this.getUserEvoLinkModel(id)
+  }
+
+  async getUserEvoLinkModel(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+
+    const row = await get('SELECT * FROM user_evolink_models WHERE id = ?', [id])
+    if (!row) return null
+
+    return {
+      id: row.id,
+      templateId: row.template_id,
+      modelId: row.model_id,
+      displayName: row.display_name,
+      mediaType: row.media_type,
+      costPerRequest: row.cost_per_request,
+      proxyAccountId: row.proxy_account_id,
+      enabled: row.enabled === 1,
+      tested: row.tested === 1,
+      lastTestedAt: row.last_tested_at,
+      testResult: row.test_result ? JSON.parse(row.test_result) : null,
+      settings: row.settings ? JSON.parse(row.settings) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async deleteUserEvoLinkModel(id: string): Promise<boolean> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const result = await run('DELETE FROM user_evolink_models WHERE id = ?', [id])
+    return (result as any).changes > 0
+  }
+
+  // API端点配置相关方法
+  async createApiEndpoint(endpoint: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const stmt = `
+      INSERT INTO api_endpoints (
+        id, provider, media_type, endpoint_url, description, enabled, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `
+
+    await run(stmt, [
+      endpoint.id,
+      endpoint.provider,
+      endpoint.mediaType,
+      endpoint.endpointUrl,
+      endpoint.description || null,
+      endpoint.enabled !== false ? 1 : 0,
+      endpoint.createdAt,
+      endpoint.updatedAt
+    ])
+
+    return endpoint
+  }
+
+  async getApiEndpoints(): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all('SELECT * FROM api_endpoints ORDER BY provider, media_type')
+    return rows.map(row => ({
+      id: row.id,
+      provider: row.provider,
+      mediaType: row.media_type,
+      endpointUrl: row.endpoint_url,
+      description: row.description,
+      enabled: row.enabled === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async getApiEndpointsByProvider(provider: string): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    const rows = await all(
+      'SELECT * FROM api_endpoints WHERE provider = ? AND enabled = 1 ORDER BY media_type',
+      [provider]
+    )
+    return rows.map(row => ({
+      id: row.id,
+      provider: row.provider,
+      mediaType: row.media_type,
+      endpointUrl: row.endpoint_url,
+      description: row.description,
+      enabled: row.enabled === 1,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  
+  // Routing Rules Methods
+  async createRoutingRule(rule: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const now = new Date().toISOString()
+    const id = randomUUID()
+
+    await run(
+      `INSERT INTO routing_rules (
+        id, name, description, priority, enabled, conditions,
+        target_proxy_account_id, action, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        rule.name,
+        rule.description || null,
+        rule.priority || 100,
+        rule.enabled ? 1 : 0,
+        JSON.stringify(rule.conditions || {}),
+        rule.targetProxyAccountId || null,
+        rule.action || 'route',
+        now,
+        now
+      ]
+    )
+
+    return this.getRoutingRule(id)
+  }
+
+  async getRoutingRule(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+    const row = await get('SELECT * FROM routing_rules WHERE id = ?', [id])
+
+    if (!row) return null
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      priority: row.priority,
+      enabled: row.enabled === 1,
+      conditions: JSON.parse(row.conditions || '{}'),
+      targetProxyAccountId: row.target_proxy_account_id,
+      action: row.action,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async getRoutingRules(params?: any): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    let query = 'SELECT * FROM routing_rules'
+    const queryParams: any[] = []
+
+    if (params?.enabled !== undefined) {
+      query += ' WHERE enabled = ?'
+      queryParams.push(params.enabled ? 1 : 0)
+    }
+
+    query += ' ORDER BY priority ASC, created_at DESC'
+
+    const rows = await all(query, queryParams)
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      priority: row.priority,
+      enabled: row.enabled === 1,
+      conditions: JSON.parse(row.conditions || '{}'),
+      targetProxyAccountId: row.target_proxy_account_id,
+      action: row.action,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateRoutingRule(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const allowedFields = ['name', 'description', 'priority', 'enabled', 'conditions', 'targetProxyAccountId', 'action']
+    const setClause: string[] = []
+    const values: any[] = []
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        const dbField = field.replace(/([A-Z])/g, '_$1').toLowerCase()
+        if (field === 'conditions') {
+          setClause.push(`${dbField} = ?`)
+          values.push(JSON.stringify(updates[field]))
+        } else if (field === 'enabled') {
+          setClause.push(`${dbField} = ?`)
+          values.push(updates[field] ? 1 : 0)
+        } else {
+          setClause.push(`${dbField} = ?`)
+          values.push(updates[field])
+        }
+      }
+    }
+
+    if (setClause.length === 0) {
+      throw new Error('No valid fields to update')
+    }
+
+    setClause.push('updated_at = ?')
+    values.push(new Date().toISOString())
+    values.push(id)
+
+    await run(`UPDATE routing_rules SET ${setClause.join(', ')} WHERE id = ?`, values)
+    return this.getRoutingRule(id)
+  }
+
+  async deleteRoutingRule(id: string): Promise<boolean> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+    const result = await run('DELETE FROM routing_rules WHERE id = ?', [id])
+    return (result as any).changes > 0
+  }
+
+  // Cost Thresholds Methods
+  async createCostThreshold(threshold: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const now = new Date().toISOString()
+    const id = randomUUID()
+
+    await run(
+      `INSERT INTO cost_thresholds (
+        id, name, description, threshold_type, threshold_value,
+        currency, period, enabled, alert_email, alert_webhook,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        threshold.name,
+        threshold.description || null,
+        threshold.thresholdType || 'daily',
+        threshold.thresholdValue,
+        threshold.currency || 'USD',
+        threshold.period || 'daily',
+        threshold.enabled ? 1 : 0,
+        threshold.alertEmail || null,
+        threshold.alertWebhook || null,
+        now,
+        now
+      ]
+    )
+
+    return this.getCostThreshold(id)
+  }
+
+  async getCostThreshold(id: string): Promise<any> {
+    await this.ensureReady()
+    const get = promisify(this.db.get.bind(this.db))
+    const row = await get('SELECT * FROM cost_thresholds WHERE id = ?', [id])
+
+    if (!row) return null
+
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      thresholdType: row.threshold_type,
+      thresholdValue: row.threshold_value,
+      currency: row.currency,
+      period: row.period,
+      enabled: row.enabled === 1,
+      alertEmail: row.alert_email,
+      alertWebhook: row.alert_webhook,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }
+  }
+
+  async getCostThresholds(params?: any): Promise<any[]> {
+    await this.ensureReady()
+    const all = promisify(this.db.all.bind(this.db))
+
+    let query = 'SELECT * FROM cost_thresholds'
+    const queryParams: any[] = []
+
+    if (params?.enabled !== undefined) {
+      query += ' WHERE enabled = ?'
+      queryParams.push(params.enabled ? 1 : 0)
+    }
+
+    if (params?.thresholdType) {
+      query += params?.enabled !== undefined ? ' AND threshold_type = ?' : ' WHERE threshold_type = ?'
+      queryParams.push(params.thresholdType)
+    }
+
+    query += ' ORDER BY created_at DESC'
+
+    const rows = await all(query, queryParams)
+    return rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      thresholdType: row.threshold_type,
+      thresholdValue: row.threshold_value,
+      currency: row.currency,
+      period: row.period,
+      enabled: row.enabled === 1,
+      alertEmail: row.alert_email,
+      alertWebhook: row.alert_webhook,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }))
+  }
+
+  async updateCostThreshold(id: string, updates: any): Promise<any> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+
+    const allowedFields = ['name', 'description', 'thresholdType', 'thresholdValue', 'currency', 'period', 'enabled', 'alertEmail', 'alertWebhook']
+    const setClause: string[] = []
+    const values: any[] = []
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        const dbField = field.replace(/([A-Z])/g, '_$1').toLowerCase()
+        if (field === 'enabled') {
+          setClause.push(`${dbField} = ?`)
+          values.push(updates[field] ? 1 : 0)
+        } else {
+          setClause.push(`${dbField} = ?`)
+          values.push(updates[field])
+        }
+      }
+    }
+
+    if (setClause.length === 0) {
+      throw new Error('No valid fields to update')
+    }
+
+    setClause.push('updated_at = ?')
+    values.push(new Date().toISOString())
+    values.push(id)
+
+    await run(`UPDATE cost_thresholds SET ${setClause.join(', ')} WHERE id = ?`, values)
+    return this.getCostThreshold(id)
+  }
+
+  async deleteCostThreshold(id: string): Promise<boolean> {
+    await this.ensureReady()
+    const run = promisify(this.db.run.bind(this.db))
+    const result = await run('DELETE FROM cost_thresholds WHERE id = ?', [id])
+    return (result as any).changes > 0
   }
 
   async close(): Promise<void> {

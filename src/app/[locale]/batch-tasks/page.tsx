@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
-import { Button } from '@/components/ui/button'
+// import { Button } from '@/components/ui/button' // 暂时移除，使用原生HTML按钮
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { BatchTaskForm } from '@/components/batch-task-form'
+import { BatchTaskForm } from '@/components/batch-task-form' // 重新启用，应该已修复SQLite客户端编译问题
 import { useQuery } from '@tanstack/react-query'
 
 interface BatchTask {
@@ -29,14 +29,21 @@ export default function BatchTasksPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [selectedBatch, setSelectedBatch] = useState<BatchTask | null>(null)
 
+  // 调试输出
+  console.log('BatchTasksPage render:', { showCreateForm, batchTasksStatus: 'loading' })
+
   // 获取批量任务列表
   const { data: batchTasks, refetch: refetchBatchTasks } = useQuery({
     queryKey: ['batch-tasks'],
     queryFn: async () => {
-      const response = await fetch('/api/batch-tasks')
+      console.log('📡 Fetching batch tasks list...')
+      const response = await fetch('/api/batch-tasks/')
       const result = await response.json()
+      console.log('📊 Batch tasks response:', result)
       return result.success ? result.data : { items: [], total: 0 }
-    }
+    },
+    // 添加自动刷新，每5秒刷新一次
+    refetchInterval: 5000
   })
 
   // 获取选中批量任务的详细信息
@@ -44,17 +51,20 @@ export default function BatchTasksPage() {
     queryKey: ['batch-task-detail', selectedBatch?.id],
     queryFn: async () => {
       if (!selectedBatch) return null
-      const response = await fetch(`/api/batch-tasks?id=${selectedBatch.id}`)
+      const response = await fetch(`/api/batch-tasks/?id=${selectedBatch.id}`)
       const result = await response.json()
       return result.success ? result.data : null
     },
-    enabled: !!selectedBatch
+    enabled: !!selectedBatch,
+    // 添加自动刷新，每5秒刷新一次详情
+    refetchInterval: selectedBatch ? 5000 : false
   })
 
   // 开始批量任务
   const startBatchTask = async (batchId: string) => {
     try {
-      const response = await fetch('/api/batch-tasks', {
+      console.log('🚀 Starting batch task:', batchId)
+      const response = await fetch('/api/batch-tasks/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -64,14 +74,20 @@ export default function BatchTasksPage() {
       })
 
       const result = await response.json()
+      console.log('📋 Start batch response:', result)
+
       if (result.success) {
+        console.log('✅ Batch task started successfully')
+        // 立即刷新列表以显示状态更新
         refetchBatchTasks()
+        alert('批量任务已开始执行！')
       } else {
-        alert('启动失败: ' + result.error)
+        console.error('❌ Failed to start batch task:', result.error)
+        alert('启动失败: ' + (result.error || '未知错误'))
       }
     } catch (error) {
-      console.error('启动批量任务失败:', error)
-      alert('启动失败')
+      console.error('💥 Start batch task error:', error)
+      alert('启动失败，请检查网络连接')
     }
   }
 
@@ -80,7 +96,8 @@ export default function BatchTasksPage() {
     if (!confirm('确定要取消这个批量任务吗？')) return
 
     try {
-      const response = await fetch('/api/batch-tasks', {
+      console.log('⏹ Cancelling batch task:', batchId)
+      const response = await fetch('/api/batch-tasks/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -90,14 +107,19 @@ export default function BatchTasksPage() {
       })
 
       const result = await response.json()
+      console.log('📋 Cancel batch response:', result)
+
       if (result.success) {
+        console.log('✅ Batch task cancelled successfully')
         refetchBatchTasks()
+        alert('批量任务已取消！')
       } else {
-        alert('取消失败: ' + result.error)
+        console.error('❌ Failed to cancel batch task:', result.error)
+        alert('取消失败: ' + (result.error || '未知错误'))
       }
     } catch (error) {
-      console.error('取消批量任务失败:', error)
-      alert('取消失败')
+      console.error('💥 Cancel batch task error:', error)
+      alert('取消失败，请检查网络连接')
     }
   }
 
@@ -131,16 +153,27 @@ export default function BatchTasksPage() {
     return Math.round((batch.completedSubtasks / batch.totalSubtasks) * 100)
   }
 
+  // 创建表单视图
   if (showCreateForm) {
     return (
       <div className="container mx-auto py-6 max-w-4xl">
         <div className="mb-6">
-          <Button
-            variant="outline"
+          <button
             onClick={() => setShowCreateForm(false)}
+            style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.375rem',
+              backgroundColor: '#6b7280',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
           >
             ← 返回批量任务列表
-          </Button>
+          </button>
         </div>
 
         <div className="mb-6">
@@ -152,6 +185,7 @@ export default function BatchTasksPage() {
 
         <BatchTaskForm
           onSubmit={(result) => {
+            console.log('BatchTaskForm 提交结果:', result)
             setShowCreateForm(false)
             refetchBatchTasks()
             alert(`批量任务创建成功！将生成 ${result.totalSubtasks} 个子任务`)
@@ -162,6 +196,7 @@ export default function BatchTasksPage() {
     )
   }
 
+  // 主列表视图
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
@@ -171,9 +206,46 @@ export default function BatchTasksPage() {
             管理和监控批量生成任务
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
-          创建批量任务
-        </Button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              console.log('调试按钮1被点击')
+              alert('页面加载正常，showCreateForm = ' + showCreateForm)
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.375rem',
+              backgroundColor: '#ffffff',
+              color: '#374151',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+          >
+            🐛 调试状态
+          </button>
+          <button
+            onClick={() => {
+              console.log('创建批量任务按钮被点击')
+              setShowCreateForm(true)
+            }}
+            style={{
+              padding: '0.5rem 1rem',
+              border: '1px solid #e2e8f0',
+              borderRadius: '0.375rem',
+              backgroundColor: '#3b82f6',
+              color: '#ffffff',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+          >
+            创建批量任务
+          </button>
+        </div>
       </div>
 
       {/* 批量任务列表 */}
@@ -185,9 +257,22 @@ export default function BatchTasksPage() {
               <p className="text-muted-foreground mb-4">
                 创建第一个批量任务来体验变量系统的强大功能
               </p>
-              <Button onClick={() => setShowCreateForm(true)}>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#3b82f6',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+              >
                 创建批量任务
-              </Button>
+              </button>
             </CardContent>
           </Card>
         ) : (
@@ -252,29 +337,57 @@ export default function BatchTasksPage() {
                 {/* 操作按钮 */}
                 <div className="flex gap-2">
                   {batch.status === 'pending' && (
-                    <Button
-                      size="sm"
+                    <button
                       onClick={() => startBatchTask(batch.id)}
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.375rem',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
                     >
                       开始执行
-                    </Button>
+                    </button>
                   )}
                   {(batch.status === 'pending' || batch.status === 'running') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <button
                       onClick={() => cancelBatchTask(batch.id)}
+                      style={{
+                        padding: '0.25rem 0.75rem',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '0.375rem',
+                        backgroundColor: '#ef4444',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        transition: 'all 0.2s'
+                      }}
                     >
                       取消任务
-                    </Button>
+                    </button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <button
                     onClick={() => setSelectedBatch(batch)}
+                    style={{
+                      padding: '0.25rem 0.75rem',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '0.375rem',
+                      backgroundColor: '#ffffff',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      fontWeight: '500',
+                      transition: 'all 0.2s'
+                    }}
                   >
                     查看详情
-                  </Button>
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -288,9 +401,22 @@ export default function BatchTasksPage() {
           <div className="bg-white rounded-lg max-w-4xl max-h-[80vh] overflow-auto p-6 m-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">{selectedBatch.name}</h2>
-              <Button variant="outline" onClick={() => setSelectedBatch(null)}>
+              <button
+                onClick={() => setSelectedBatch(null)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.375rem',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s'
+                }}
+              >
                 关闭
-              </Button>
+              </button>
             </div>
 
             <div className="space-y-6">
@@ -316,9 +442,20 @@ export default function BatchTasksPage() {
                           {getStatusText(subtask.status)}
                         </Badge>
                         {subtask.status === 'completed' && subtask.results?.length > 0 && (
-                          <Button size="sm" variant="outline">
+                          <button
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '0.25rem',
+                              backgroundColor: '#3b82f6',
+                              color: '#ffffff',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
+                              fontWeight: '500'
+                            }}
+                          >
                             查看结果
-                          </Button>
+                          </button>
                         )}
                       </div>
                     </div>

@@ -1,4 +1,4 @@
-import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 
-export default function Home() {
-  const t = useTranslations('home')
-  const tCommon = useTranslations('common')
+export default async function Home() {
+  const t = await getTranslations('home')
+  const tCommon = await getTranslations('common')
 
   return (
     <div className="flex flex-col items-center justify-center p-8 bg-background min-h-[calc(100vh-4rem)]">
